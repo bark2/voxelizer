@@ -1,0 +1,54 @@
+[
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-std=c++11",
+            "-g",
+            "-o",
+            "voxelizer",
+            "common.cc"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "common.cc"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-std=c++11",
+            "-g",
+            "-o",
+            "voxelizer",
+            "triangle.cc"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "triangle.cc"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-std=c++11",
+            "-g",
+            "-o",
+            "voxelizer",
+            "voxelizer.cc"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "voxelizer.cc"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-std=c++11",
+            "-g",
+            "-o",
+            "voxelizer",
+            "obj.cc"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "obj.cc"
+    }
+]
