@@ -14,6 +14,10 @@
 #include <string>
 #include <vector>
 
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+
 static const u32 max_line = 128;
 
 enum Command {
@@ -28,9 +32,9 @@ enum Command {
     COMMANDS_COUNT
 };
 
-static const std::array<const std::string, COMMANDS_COUNT> commands_map {
-    "v ", "vt ", "vn ", "f ", "g ", "o ", "s ", "#"
-};
+static const std::array<const std::string, COMMANDS_COUNT> commands_map { "v ", "vt ", "vn ",
+                                                                          "f ", "g ",  "o ",
+                                                                          "s ", "#" };
 
 std::vector<Mesh>
 load_obj_file(const std::string& filename)
@@ -123,36 +127,32 @@ load_obj_file(const std::string& filename)
 
                 u32 indexes[3];
                 const size_t first_delimeter = line.find_first_of('/', i_line);
-                const size_t second_delimeter
-                    = line.find_first_of('/', first_delimeter + 1);
+                const size_t second_delimeter = line.find_first_of('/', first_delimeter + 1);
                 const size_t ending_space = line.find_first_of(' ', second_delimeter + 1);
 
-                indexes[0] = strtoul(
-                                 line.substr(static_cast<size_t>(i_line), first_delimeter)
-                                     .c_str(),
-                                 nullptr, 10)
-                    - 1;
-                indexes[1] = strtoul(
-                                 line.substr(
-                                         static_cast<size_t>(first_delimeter + 1),
-                                         second_delimeter)
-                                     .c_str(),
-                                 nullptr, 10)
-                    - 1;
-                indexes[2]
-                    = strtoul(
-                          line.substr(
-                                  static_cast<size_t>(second_delimeter + 1), ending_space)
-                              .c_str(),
-                          nullptr, 10)
-                    - 1;
+                indexes[0] =
+                    strtoul(
+                        line.substr(static_cast<size_t>(i_line), first_delimeter).c_str(),
+                        nullptr, 10) -
+                    1;
+                indexes[1] =
+                    strtoul(
+                        line.substr(static_cast<size_t>(first_delimeter + 1), second_delimeter)
+                            .c_str(),
+                        nullptr, 10) -
+                    1;
+                indexes[2] =
+                    strtoul(
+                        line.substr(static_cast<size_t>(second_delimeter + 1), ending_space)
+                            .c_str(),
+                        nullptr, 10) -
+                    1;
 
-                face[i]
-                    = { positions[indexes[0]], normals[indexes[2]],
-                        (vertex_properties_n == 3) ? uvs[indexes[1]] : vec2(0.0f, 0.0f) };
+                face[i] = { positions[indexes[0]], normals[indexes[2]],
+                            (vertex_properties_n == 3) ? uvs[indexes[1]] : vec2(0.0f, 0.0f) };
 
-                for (i_line = ending_space;
-                     i_line < line.length() && isspace(line.at(i_line)); i_line++)
+                for (i_line = ending_space; i_line < line.length() && isspace(line.at(i_line));
+                     i_line++)
                     ;
             }
             if (is_quad) {
@@ -196,6 +196,76 @@ load_obj_file(const std::string& filename)
     return std::move(meshes);
 }
 
+Mesh
+processMesh(aiMesh* mesh, const aiScene* scene)
+{
+    std::vector<Vertex> vertices;
+    std::vector<u32> indices;
+
+    for (u32 i = 0; i < mesh->mNumVertices; i++) {
+        Vertex vertex;
+        vertex.pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+        vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+        vertices.push_back(vertex);
+    }
+    for (u32 i = 0; i < mesh->mNumFaces; i++) {
+        aiFace face = mesh->mFaces[i];
+        for (u32 j = 0; j < face.mNumIndices; j++) indices.push_back(face.mIndices[j]);
+    }
+    return { vertices, indices, false };
+}
+
+void
+processNode(aiNode* node, const aiScene* scene, std::vector<Mesh>* meshes)
+{
+    for (u32 i = 0; i < node->mNumMeshes; i++) {
+        aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+        meshes->emplace_back(processMesh(mesh, scene));
+    }
+    for (u32 i = 0; i < node->mNumChildren; i++) {
+        processNode(node->mChildren[i], scene, meshes);
+    }
+}
+
+std::vector<Mesh>
+load_obj_file_(const std::string& filename)
+{
+    std::vector<Mesh> meshes;
+    Assimp::Importer importer;
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate);
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+        printf("ERROR::ASSIMP::%s", importer.GetErrorString());
+        return {};
+    }
+    processNode(scene->mRootNode, scene, &meshes);
+
+    vec3 aabb_min { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
+                    std::numeric_limits<float>::max() },
+        aabb_max { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(),
+                   -std::numeric_limits<float>::max() };
+
+    for (auto& m : meshes) {
+        for (auto& v : m.vertices) {
+            for (size_t i = 0; i < 3; i++) {
+                aabb_max[i] = std::max(aabb_max[i], v.pos[i]);
+                aabb_min[i] = std::min(aabb_min[i], v.pos[i]);
+            }
+        }
+    }
+    vec3 aabb_range = aabb_max - aabb_min;
+    f32 aabb_max_size = std::max({ aabb_range.x, aabb_range.y, aabb_range.z });
+    for (auto& m : meshes) {
+        for (auto& v : m.vertices) {
+            v.pos.x = (v.pos.x - aabb_min.x) / (aabb_max.x - aabb_min.x);
+            v.pos.y = (v.pos.y - aabb_min.y) / (aabb_max.y - aabb_min.y);
+            v.pos.z = (v.pos.z - aabb_min.z) / (aabb_max.z - aabb_min.z);
+            assert(v.pos.x <= 1 && v.pos.y <= 1 && v.pos.z <= 1);
+        }
+    }
+
+    return meshes;
+}
+
 // 2. Chunk Structure
 // -------------------------------------------------------------------------------
 // # Bytes  | Type       | Value
@@ -235,19 +305,17 @@ to_little(u32 big)
 // little indian
 int
 export_vox_file(
-    const std::string& filename,
-    const std::vector<bool>& grid,
-    u32 resolution,
-    u32 voxels_n)
+    const std::string& filename, const std::vector<bool>& grid, u32 resolution, u32 voxels_n)
 {
     FILE* out = fopen(filename.c_str(), "wb");
     if (!out) return 1;
 
-    u32 meta_size = 4 * 3 * sizeof(i32);
-    u32 size_size = 3 * sizeof(i32);
-    u32 xyzi_size = (voxels_n + 1) * sizeof(i32);
-    u32 main_children_size = 2 * meta_size + size_size + xyzi_size;
-    u32 total = main_children_size + meta_size;
+    u32 meta_size = 3 * sizeof(u32);
+    u32 size_size = 3 * sizeof(u32);
+    u32 xyzi_size = (voxels_n + 1) * sizeof(u32);
+    u32 header_size = 56;
+    u32 total = header_size + xyzi_size;
+    u32 main_children_size = total - meta_size - 8;
     u32 header[] = { to_little(0x564f5820),
                      150,
                      to_little(0x4d41494e),
@@ -265,13 +333,13 @@ export_vox_file(
                      voxels_n };
     std::vector<u32> buffer;
     buffer.reserve(total);
-    for (auto&& s : header) buffer.push_back(s);
+    for (auto&& s : header) buffer.emplace_back(s);
     for (u8 x = 0; x < resolution; x++)
         for (u8 y = 0; y < resolution; y++)
             for (u8 z = 0; z < resolution; z++)
-                if (grid[x * resolution * resolution + y * resolution + z]) {
-                    u32 position = (x << 24) + (y << 16) + (z << 8);
-                    buffer.push_back(position);
+                if (grid[(x * resolution * resolution) + (y * resolution) + z]) {
+                    u32 position = (x << 24) + (y << 16) + (z << 8) + 121;
+                    buffer.emplace_back(to_little(position));
                 }
     fwrite(buffer.data(), sizeof(u32), buffer.size(), out);
     fclose(out);

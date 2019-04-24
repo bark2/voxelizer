@@ -28,9 +28,6 @@ struct Triangle : public array<vec3, 3> {
     vec3 normal() const;
 };
 
-
-
-
 struct Mesh {
     std::vector<Vertex> vertices;
     std::vector<u32> indices;
