@@ -131,22 +131,19 @@ load_obj_file(const std::string& filename)
                 const size_t ending_space = line.find_first_of(' ', second_delimeter + 1);
 
                 indexes[0] =
-                    strtoul(
-                        line.substr(static_cast<size_t>(i_line), first_delimeter).c_str(),
-                        nullptr, 10) -
+                    strtoul(line.substr(static_cast<size_t>(i_line), first_delimeter).c_str(),
+                            nullptr, 10) -
                     1;
-                indexes[1] =
-                    strtoul(
-                        line.substr(static_cast<size_t>(first_delimeter + 1), second_delimeter)
-                            .c_str(),
-                        nullptr, 10) -
-                    1;
-                indexes[2] =
-                    strtoul(
-                        line.substr(static_cast<size_t>(second_delimeter + 1), ending_space)
-                            .c_str(),
-                        nullptr, 10) -
-                    1;
+                indexes[1] = strtoul(line.substr(static_cast<size_t>(first_delimeter + 1),
+                                                 second_delimeter)
+                                         .c_str(),
+                                     nullptr, 10) -
+                             1;
+                indexes[2] = strtoul(line.substr(static_cast<size_t>(second_delimeter + 1),
+                                                 ending_space)
+                                         .c_str(),
+                                     nullptr, 10) -
+                             1;
 
                 face[i] = { positions[indexes[0]], normals[indexes[2]],
                             (vertex_properties_n == 3) ? uvs[indexes[1]] : vec2(0.0f, 0.0f) };
@@ -228,7 +225,7 @@ processNode(aiNode* node, const aiScene* scene, std::vector<Mesh>* meshes)
 }
 
 std::vector<Mesh>
-load_obj_file_(const std::string& filename)
+ai_load_obj_file(const std::string& filename)
 {
     std::vector<Mesh> meshes;
     Assimp::Importer importer;
@@ -304,18 +301,25 @@ to_little(u32 big)
 
 // little indian
 int
-export_vox_file(
-    const std::string& filename, const std::vector<bool>& grid, u32 resolution, u32 voxels_n)
+export_vox_file(const std::string& filename,
+                const std::vector<bool>& grid,
+                array<u32, 3> grid_size,
+                u32 voxels_n)
 {
     FILE* out = fopen(filename.c_str(), "wb");
     if (!out) return 1;
 
     u32 meta_size = 3 * sizeof(u32);
     u32 size_size = 3 * sizeof(u32);
+    u32 max_grid_size = std::max({ grid_size[0], grid_size[1], grid_size[2] });
+    array<u32, 3> scaling = { max_grid_size / grid_size[0], max_grid_size / grid_size[1],
+                              max_grid_size / grid_size[2] };
+    voxels_n *= scaling[0] * scaling[1] * scaling[2];
     u32 xyzi_size = (voxels_n + 1) * sizeof(u32);
     u32 header_size = 56;
     u32 total = header_size + xyzi_size;
     u32 main_children_size = total - meta_size - 8;
+
     u32 header[] = { to_little(0x564f5820),
                      150,
                      to_little(0x4d41494e),
@@ -324,9 +328,9 @@ export_vox_file(
                      to_little(0x53495a45),
                      size_size,
                      0,
-                     resolution,
-                     resolution,
-                     resolution,
+                     grid_size[0],
+                     grid_size[1],
+                     grid_size[2],
                      to_little(0x58595a49),
                      xyzi_size,
                      0,
@@ -334,13 +338,19 @@ export_vox_file(
     std::vector<u32> buffer;
     buffer.reserve(total);
     for (auto&& s : header) buffer.emplace_back(s);
-    for (u8 x = 0; x < resolution; x++)
-        for (u8 y = 0; y < resolution; y++)
-            for (u8 z = 0; z < resolution; z++)
-                if (grid[(x * resolution * resolution) + (y * resolution) + z]) {
-                    u32 position = (x << 24) + (y << 16) + (z << 8) + 121;
-                    buffer.emplace_back(to_little(position));
-                }
+    for (u8 x = 0; x < grid_size[0]; x++)         // =scaling[0])
+        for (u8 y = 0; y < grid_size[1]; y++)     // =scaling[1])
+            for (u8 z = 0; z < grid_size[2]; z++) // =scaling[2])
+                if (grid[x * grid_size[1] * grid_size[2] + y * grid_size[2] + z])
+                    for (u8 i = 0; i < scaling[0]; i++)
+                        for (u8 j = 0; j < scaling[1]; j++)
+                            for (u8 k = 0; k < scaling[2]; k++) {
+                                u32 position_color = ((x * scaling[0] + i) << 24) +
+                                                     ((y * scaling[1] + j) << 16) +
+                                                     ((z * scaling[2] + k) << 8) + 121;
+                                buffer.emplace_back(to_little(position_color));
+                            }
+
     fwrite(buffer.data(), sizeof(u32), buffer.size(), out);
     fclose(out);
     return 0;

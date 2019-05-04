@@ -1,10 +1,17 @@
 # $ intercept-build make
+
+IRIT_DIR = /home/bar/Programming/Projects/voxelizer/irit/irit-sm
+
+include $(IRIT_DIR)/makeflag.unx
+
 .SUFFIXES =
 CC         = clang++
-CFLAGS = -W -std=c++11 -g
+CFLAGS = -W -O2 -g -std=c++11
+LIBS = -lassimp
 
 vox: voxelizer.o obj.o triangle.o common.o
-	$(CC) -o vox voxelizer.o obj.o triangle.o common.o -lassimp
+	$(CC) $(LIBS) $(INC) -o vox voxelizer.o obj.o triangle.o common.o 
+#iritSkel.cpp $(IRIT_LIBS) -lm 
 voxelizer: voxelizer.cc obj.h types.h
 obj: obj.cc common.h types.h
 triangle: triangle.cc types.h
@@ -14,4 +21,4 @@ clean:
 
 .SUFFIXES = .cc .o
 .cc.o:
-	$(CC) $(CFLAGS) -c $<
+	$(CC) $(CFLAGS) -c $< -I./
