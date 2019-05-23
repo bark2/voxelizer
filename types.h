@@ -33,6 +33,11 @@ struct Mesh {
     bool has_uvs;
 };
 
+struct Voxel {
+  bool valid;
+  enum Type { CLOSING, OPENING, BOTH } type;
+};
+
 template <typename Vec>
 inline Vec
 to_xy(const Vec& v)
@@ -111,8 +116,3 @@ get_inv_swizzler(u32 i)
     }
     return result;
 }
-// define it per type in .cc file?
-template <typename Vec>
-constexpr array<Swizzler<Vec>, 3> swizzlers = { get_swizzler<Swizzler<Vec>>(0),
-                                      get_swizzler<Swizzler<Vec>>(1),
-                                      get_swizzler<Swizzler<Vec>>(2) };

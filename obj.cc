@@ -183,9 +183,8 @@ load_obj_file(const std::string& filename)
     f32 aabb_max_size = std::max({ aabb_range.x, aabb_range.y, aabb_range.z });
     for (auto& m : meshes) {
         for (auto& v : m.vertices) {
-            v.pos.x = (v.pos.x - aabb_min.x) / (aabb_max.x - aabb_min.x);
-            v.pos.y = (v.pos.y - aabb_min.y) / (aabb_max.y - aabb_min.y);
-            v.pos.z = (v.pos.z - aabb_min.z) / (aabb_max.z - aabb_min.z);
+            assert(0);
+	    // fill
             assert(v.pos.x <= 1 && v.pos.y <= 1 && v.pos.z <= 1);
         }
     }
@@ -202,7 +201,7 @@ processMesh(aiMesh* mesh, const aiScene* scene)
     for (u32 i = 0; i < mesh->mNumVertices; i++) {
         Vertex vertex;
         vertex.pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-        vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+        // vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
         vertices.push_back(vertex);
     }
     for (u32 i = 0; i < mesh->mNumFaces; i++) {
@@ -235,30 +234,6 @@ ai_load_obj_file(const std::string& filename)
         return {};
     }
     processNode(scene->mRootNode, scene, &meshes);
-
-    vec3 aabb_min { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
-                    std::numeric_limits<float>::max() },
-        aabb_max { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(),
-                   -std::numeric_limits<float>::max() };
-
-    for (auto& m : meshes) {
-        for (auto& v : m.vertices) {
-            for (size_t i = 0; i < 3; i++) {
-                aabb_max[i] = std::max(aabb_max[i], v.pos[i]);
-                aabb_min[i] = std::min(aabb_min[i], v.pos[i]);
-            }
-        }
-    }
-    vec3 aabb_range = aabb_max - aabb_min;
-    f32 aabb_max_size = std::max({ aabb_range.x, aabb_range.y, aabb_range.z });
-    for (auto& m : meshes) {
-        for (auto& v : m.vertices) {
-            v.pos.x = (v.pos.x - aabb_min.x) / (aabb_max.x - aabb_min.x);
-            v.pos.y = (v.pos.y - aabb_min.y) / (aabb_max.y - aabb_min.y);
-            v.pos.z = (v.pos.z - aabb_min.z) / (aabb_max.z - aabb_min.z);
-            assert(v.pos.x <= 1 && v.pos.y <= 1 && v.pos.z <= 1);
-        }
-    }
 
     return meshes;
 }
@@ -302,7 +277,7 @@ to_little(u32 big)
 // little indian
 int
 export_vox_file(const std::string& filename,
-                const std::vector<bool>& grid,
+                const std::vector<Voxel>& grid,
                 array<u32, 3> grid_size,
                 u32 voxels_n)
 {
@@ -338,16 +313,16 @@ export_vox_file(const std::string& filename,
     std::vector<u32> buffer;
     buffer.reserve(total);
     for (auto&& s : header) buffer.emplace_back(s);
-    for (u8 x = 0; x < grid_size[0]; x++)         // =scaling[0])
-        for (u8 y = 0; y < grid_size[1]; y++)     // =scaling[1])
-            for (u8 z = 0; z < grid_size[2]; z++) // =scaling[2])
-                if (grid[x * grid_size[1] * grid_size[2] + y * grid_size[2] + z])
+    for (u8 z = 0; z < grid_size[0]; z++)
+        for (u8 x = 0; x < grid_size[1]; x++)
+            for (u8 y = 0; y < grid_size[2]; y++)
+                if (grid[z * grid_size[1] * grid_size[2] + x * grid_size[2] + y].valid)
                     for (u8 i = 0; i < scaling[0]; i++)
                         for (u8 j = 0; j < scaling[1]; j++)
                             for (u8 k = 0; k < scaling[2]; k++) {
-                                u32 position_color = ((x * scaling[0] + i) << 24) +
-                                                     ((y * scaling[1] + j) << 16) +
-                                                     ((z * scaling[2] + k) << 8) + 121;
+                                u32 position_color = ((z * scaling[0] + i) << 24) +
+                                                     ((x * scaling[1] + j) << 16) +
+                                                     ((y * scaling[2] + k) << 8) + 121;
                                 buffer.emplace_back(to_little(position_color));
                             }
 

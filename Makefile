@@ -6,12 +6,11 @@ include $(IRIT_DIR)/makeflag.unx
 
 .SUFFIXES =
 CC         = clang++
-CFLAGS = -W -O2 -g -std=c++11
+CFLAGS = -W -O0 -g -std=c++11
 LIBS = -lassimp
 
 vox: voxelizer.o obj.o triangle.o common.o
-	$(CC) $(LIBS) $(INC) -o vox voxelizer.o obj.o triangle.o common.o 
-#iritSkel.cpp $(IRIT_LIBS) -lm 
+	$(CC) $(LIBS) $(INC) -o vox voxelizer.o obj.o triangle.o common.o iritSkel.cpp $(IRIT_LIBS) -lm 
 voxelizer: voxelizer.cc obj.h types.h
 obj: obj.cc common.h types.h
 triangle: triangle.cc types.h
