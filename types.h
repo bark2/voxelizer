@@ -46,7 +46,7 @@ struct Mesh {
 
 struct Voxel {
     bool valid;
-    enum Type { NONE, CLOSING, OPENING, BOTH } min_type, max_type;
+    enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
     f32 max_intersection_off;
 };
 
