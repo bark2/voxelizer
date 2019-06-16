@@ -313,7 +313,7 @@ main(int argc, char* argv[])
 
     // std::vector<bool> grid(grid_size[0] * grid_size[1] * grid_size[2], false);
     std::vector<Voxel> grid(grid_size[0] * grid_size[1] * grid_size[2],
-                            { false, Voxel::NONE, Voxel::NONE, 0.0f });
+                            { false, Voxel::NONE, 0.0f });
 
     extern vec3 scene_aabb_min;
     extern vec3 scene_aabb_max;
