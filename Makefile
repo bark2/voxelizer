@@ -9,8 +9,12 @@ CC         = clang++
 CFLAGS = -W -O0 -g -std=c++11
 LIBS = -lassimp
 
-vox: voxelizer.o obj.o triangle.o common.o
-	$(CC) $(LIBS) $(INC) -o vox voxelizer.o obj.o triangle.o common.o iritSkel.cpp $(IRIT_LIBS) -lm 
+all: vox test
+	./test
+vox: voxelizer.o obj.o triangle.o common.o iritSkel.cpp
+	$(CC) $(LIBS) $(INC) $(CFLAGS) -o vox voxelizer.o obj.o triangle.o common.o iritSkel.cpp $(IRIT_LIBS) -lm
+test: test.cc obj.o triangle.o common.o
+	$(CC) $(LIBS) $(INC) $(CFLAGS) -o test test.cc obj.o triangle.o common.o
 voxelizer: voxelizer.cc obj.h types.h
 obj: obj.cc common.h types.h
 triangle: triangle.cc types.h

@@ -1,10 +1,12 @@
 #pragma once
 
+#include "csignal"
 #include <array>
+#include <cassert>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <vector>
-#include <cassert>
 
 #include "vec2.h"
 #include "vec3.h"
@@ -25,6 +27,15 @@ struct Vertex {
 
 struct Triangle : array<vec3, 3> {
     vec3 normal() const;
+
+    template <typename F>
+    Triangle
+    gen(const F& fun) const
+    {
+        Triangle t;
+        for (int i = 0; i < 3; i++) t[i] = fun(this->at(i));
+        return t;
+    }
 };
 
 struct Mesh {
@@ -34,8 +45,9 @@ struct Mesh {
 };
 
 struct Voxel {
-  bool valid;
-  enum Type { CLOSING, OPENING, BOTH } type;
+    bool valid;
+    enum Type { NONE, CLOSING, OPENING, BOTH } min_type, max_type;
+    f32 max_intersection_off;
 };
 
 template <typename Vec>
@@ -91,8 +103,7 @@ get_swizzler(u32 i)
     case 2: {
         result = to_xy;
     } break;
-    default:
-        assert(false && "swizzling with wrong index");
+    default: assert(false && "swizzling with wrong index");
     }
     return result;
 }
@@ -111,8 +122,15 @@ get_inv_swizzler(u32 i)
     case 2: {
         result = inversed_xy;
     } break;
-    default:
-        assert(false && "swizzling with wrong index");
+    default: assert(false && "swizzling with wrong index");
     }
     return result;
+}
+
+template <typename Vec3>
+Vec3
+swizzle(Vec3 v)
+{
+    for (int i = 0; i < 2; i++) std::swap(v[i], v[i + 1]);
+    return v;
 }

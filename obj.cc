@@ -20,29 +20,17 @@
 
 static const u32 max_line = 128;
 
-enum Command {
-    POSITION = 0,
-    TEXTURE,
-    NORMAL,
-    FACE,
-    GROUP,
-    OBJECT,
-    SMOOTH,
-    COMMENT,
-    COMMANDS_COUNT
-};
+enum Command { POSITION = 0, TEXTURE, NORMAL, FACE, GROUP, OBJECT, SMOOTH, COMMENT, COMMANDS_COUNT };
 
-static const std::array<const std::string, COMMANDS_COUNT> commands_map { "v ", "vt ", "vn ",
-                                                                          "f ", "g ",  "o ",
-                                                                          "s ", "#" };
+static const std::array<const std::string, COMMANDS_COUNT> commands_map { "v ", "vt ", "vn ", "f ",
+                                                                          "g ", "o ",  "s ",  "#" };
 
 std::vector<Mesh>
 load_obj_file(const std::string& filename)
 {
     std::ifstream infile(filename);
     if (!infile.is_open()) {
-        std::cout << "Error: load_obj_file\tfile: " << __FILE__ << "\tline:" << __LINE__
-                  << '\n';
+        std::cout << "Error: load_obj_file\tfile: " << __FILE__ << "\tline:" << __LINE__ << '\n';
         return {};
     }
 
@@ -80,8 +68,7 @@ load_obj_file(const std::string& filename)
         switch (c) {
         case POSITION: {
             vec3 v;
-            for (u32 i = 0; i < 3; i++)
-                v[i] = strtof(strtok_update(line, " ", i_line).data(), nullptr);
+            for (u32 i = 0; i < 3; i++) v[i] = strtof(strtok_update(line, " ", i_line).data(), nullptr);
             positions.push_back(v);
             for (size_t i = 0; i < 3; i++) {
                 aabb_max[i] = std::max(aabb_max[i], v[i]);
@@ -90,14 +77,12 @@ load_obj_file(const std::string& filename)
         } break;
         case TEXTURE: {
             vec2 v;
-            for (u32 i = 0; i < 2; i++)
-                v[i] = strtof(strtok_update(line, " ", i_line).data(), nullptr);
+            for (u32 i = 0; i < 2; i++) v[i] = strtof(strtok_update(line, " ", i_line).data(), nullptr);
             uvs.push_back(v);
         } break;
         case NORMAL: {
             vec3 v;
-            for (u32 i = 0; i < 3; i++)
-                v[i] = strtof(strtok_update(line, " ", i_line).data(), nullptr);
+            for (u32 i = 0; i < 3; i++) v[i] = strtof(strtok_update(line, " ", i_line).data(), nullptr);
             normals.push_back(v);
         } break;
         case FACE: {
@@ -130,26 +115,23 @@ load_obj_file(const std::string& filename)
                 const size_t second_delimeter = line.find_first_of('/', first_delimeter + 1);
                 const size_t ending_space = line.find_first_of(' ', second_delimeter + 1);
 
-                indexes[0] =
-                    strtoul(line.substr(static_cast<size_t>(i_line), first_delimeter).c_str(),
+                indexes[0] = strtoul(line.substr(static_cast<size_t>(i_line), first_delimeter).c_str(),
+                                     nullptr, 10) -
+                             1;
+                indexes[1] =
+                    strtoul(
+                        line.substr(static_cast<size_t>(first_delimeter + 1), second_delimeter).c_str(),
+                        nullptr, 10) -
+                    1;
+                indexes[2] =
+                    strtoul(line.substr(static_cast<size_t>(second_delimeter + 1), ending_space).c_str(),
                             nullptr, 10) -
                     1;
-                indexes[1] = strtoul(line.substr(static_cast<size_t>(first_delimeter + 1),
-                                                 second_delimeter)
-                                         .c_str(),
-                                     nullptr, 10) -
-                             1;
-                indexes[2] = strtoul(line.substr(static_cast<size_t>(second_delimeter + 1),
-                                                 ending_space)
-                                         .c_str(),
-                                     nullptr, 10) -
-                             1;
 
                 face[i] = { positions[indexes[0]], normals[indexes[2]],
                             (vertex_properties_n == 3) ? uvs[indexes[1]] : vec2(0.0f, 0.0f) };
 
-                for (i_line = ending_space; i_line < line.length() && isspace(line.at(i_line));
-                     i_line++)
+                for (i_line = ending_space; i_line < line.length() && isspace(line.at(i_line)); i_line++)
                     ;
             }
             if (is_quad) {
@@ -166,8 +148,8 @@ load_obj_file(const std::string& filename)
         case OBJECT: {
             if (vertices.empty()) break;
 
-            meshes.push_back({ std::move(vertices), std::move(indices),
-                               vertex_properties_n == 3 ? true : false });
+            meshes.push_back(
+                { std::move(vertices), std::move(indices), vertex_properties_n == 3 ? true : false });
             vertex_properties_n = 0;
         } break;
         default:;
@@ -176,15 +158,15 @@ load_obj_file(const std::string& filename)
     infile.close();
 
     if (!vertices.empty())
-        meshes.push_back({ std::move(vertices), std::move(indices),
-                           vertex_properties_n == 3 ? true : false });
+        meshes.push_back(
+            { std::move(vertices), std::move(indices), vertex_properties_n == 3 ? true : false });
 
     vec3 aabb_range = aabb_max - aabb_min;
     f32 aabb_max_size = std::max({ aabb_range.x, aabb_range.y, aabb_range.z });
     for (auto& m : meshes) {
         for (auto& v : m.vertices) {
             assert(0);
-	    // fill
+            // fill
             assert(v.pos.x <= 1 && v.pos.y <= 1 && v.pos.z <= 1);
         }
     }
@@ -218,9 +200,7 @@ processNode(aiNode* node, const aiScene* scene, std::vector<Mesh>* meshes)
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         meshes->emplace_back(processMesh(mesh, scene));
     }
-    for (u32 i = 0; i < node->mNumChildren; i++) {
-        processNode(node->mChildren[i], scene, meshes);
-    }
+    for (u32 i = 0; i < node->mNumChildren; i++) { processNode(node->mChildren[i], scene, meshes); }
 }
 
 std::vector<Mesh>
@@ -276,10 +256,10 @@ to_little(u32 big)
 
 // little indian
 int
-export_vox_file(const std::string& filename,
-                const std::vector<Voxel>& grid,
-                array<u32, 3> grid_size,
-                u32 voxels_n)
+export_magicavoxel(const std::string& filename,
+                   const std::vector<Voxel>& grid,
+                   array<i32, 3> grid_size,
+                   u32 voxels_n)
 {
     FILE* out = fopen(filename.c_str(), "wb");
     if (!out) return 1;
@@ -303,9 +283,9 @@ export_vox_file(const std::string& filename,
                      to_little(0x53495a45),
                      size_size,
                      0,
-                     grid_size[0],
-                     grid_size[1],
-                     grid_size[2],
+                     static_cast<u32>(grid_size[0]),
+                     static_cast<u32>(grid_size[1]),
+                     static_cast<u32>(grid_size[2]),
                      to_little(0x58595a49),
                      xyzi_size,
                      0,
@@ -313,18 +293,35 @@ export_vox_file(const std::string& filename,
     std::vector<u32> buffer;
     buffer.reserve(total);
     for (auto&& s : header) buffer.emplace_back(s);
-    for (u8 z = 0; z < grid_size[0]; z++)
-        for (u8 x = 0; x < grid_size[1]; x++)
-            for (u8 y = 0; y < grid_size[2]; y++)
-                if (grid[z * grid_size[1] * grid_size[2] + x * grid_size[2] + y].valid)
+
+    for (u8 x = 0; x < grid_size[0]; x++)
+        for (u8 y = 0; y < grid_size[1]; y++)
+            for (u8 z = 0; z < grid_size[2]; z++) {
+                u32 at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
+                if (grid.at(at).valid)
                     for (u8 i = 0; i < scaling[0]; i++)
                         for (u8 j = 0; j < scaling[1]; j++)
                             for (u8 k = 0; k < scaling[2]; k++) {
-                                u32 position_color = ((z * scaling[0] + i) << 24) +
-                                                     ((x * scaling[1] + j) << 16) +
-                                                     ((y * scaling[2] + k) << 8) + 121;
+                                u8 color;
+                                switch (grid.at(at).max_type) {
+                                case Voxel::OPENING: color = 121; break;
+                                case Voxel::CLOSING: color = 15; break;
+                                case Voxel::NONE: {
+                                    color = 1;
+                                    printf("NONE: %d %d %d\n", x, y, z);
+                                } break; // gray
+                                case Voxel::BOTH: color = 248; break;
+                                default: {
+                                    printf("%d\n", grid.at(at).max_type);
+                                    assert(0);
+                                }
+                                }
+                                u32 position_color = ((x * scaling[0] + i) << 24) +
+                                                     ((y * scaling[1] + j) << 16) +
+                                                     ((z * scaling[2] + k) << 8) + color;
                                 buffer.emplace_back(to_little(position_color));
                             }
+            }
 
     fwrite(buffer.data(), sizeof(u32), buffer.size(), out);
     fclose(out);

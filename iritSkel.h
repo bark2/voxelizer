@@ -15,9 +15,8 @@
 #include "include/allocate.h"
 #include "include/ip_cnvrt.h"
 #include "include/symb_lib.h"
-using CString = std::string;
 
-bool CGSkelProcessIritDataFiles(CString &FileNames, int NumFiles);
+bool CGSkelProcessIritDataFiles(const char* const* FileNames, int NumFiles);
 void CGSkelDumpOneTraversedObject(IPObjectStruct *PObj, IrtHmgnMatType Mat, void *Data);
 int CGSkelGetObjectColor(IPObjectStruct *PObj, double RGB[3]);
 const char *CGSkelGetObjectTexture(IPObjectStruct *PObj);
