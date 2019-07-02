@@ -2,13 +2,15 @@
 
 #include "vec2.h"
 #include <cassert>
-#include <iostream>
 #include <cmath>
+#include <iostream>
 #include <stdlib.h>
 
 using f32 = float;
 
 struct vec3 {
+    typedef std::size_t size_type;
+
     union {
         f32 v[3];
         struct {
@@ -32,6 +34,11 @@ struct vec3 {
     }
 
     inline operator vec2() const { return { x, y }; };
+    inline size_type
+    size() const
+    {
+        return 3;
+    };
 
     inline const vec3&
     operator+() const
@@ -47,6 +54,14 @@ struct vec3 {
     inline f32& operator[](int i) { return v[i]; }
 
     inline vec3& operator*=(const f32 t);
+
+    inline vec3&
+    operator+=(f32 t)
+    {
+        for (auto& i : v) i += t;
+        return *this;
+    }
+
     inline vec3&
     operator-=(f32 t)
     {
@@ -72,6 +87,13 @@ struct vec3 {
         return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
     }
     inline void normalize();
+
+    inline std::string
+    to_string() const
+    {
+        using std::to_string;
+        return "( " + to_string(x) + ", " + to_string(y) + ", " + to_string(z) + " )";
+    }
 };
 
 inline vec3

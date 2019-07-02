@@ -1,12 +1,9 @@
 #include "types.h"
 
 vec3
-Triangle::normal() const
+normal(const Triangle& t)
 {
-    vec3 v1 = this->at(0);
-    vec3 v2 = this->at(1);
-    vec3 v3 = this->at(2);
-    vec3 result = cross(v2 - v1, v3 - v1);
+    vec3 result = cross(t[1] - t[0], t[2] - t[0]);
     return unit_vector(result);
 }
 

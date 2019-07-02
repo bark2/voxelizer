@@ -1,12 +1,14 @@
 #pragma once
 
-#include <iostream>
 #include <cmath>
+#include <iostream>
 #include <stdlib.h>
 
 using f32 = float;
 
 struct vec2 {
+    typedef std::size_t size_type;
+
     union {
         f32 v[2];
         struct {
@@ -15,11 +17,17 @@ struct vec2 {
     };
 
     vec2() {};
-    vec2(f32 x, f32 y)	
+    vec2(f32 x, f32 y)
     {
         v[0] = x;
         v[1] = y;
     }
+
+    inline size_type
+    size() const
+    {
+        return 2;
+    };
 
     inline const vec2&
     operator+() const
@@ -52,7 +60,20 @@ struct vec2 {
         return v[0] * v[0] + v[1] * v[1];
     }
     inline void normalize();
+
+    inline std::string
+    to_string() const
+    {
+        using std::to_string;
+        return "( " + to_string(x) + ", " + to_string(y) + " )";
+    }
 };
+
+inline bool
+operator==(const vec2& v1, const vec2& v2)
+{
+    return (v1.x == v2.x && v1.y == v2.y);
+}
 
 inline vec2
 operator+(const vec2& v1, f32 a)
@@ -101,7 +122,4 @@ unit_vector(vec2 v)
     return v / v.length();
 }
 
-inline vec2 operator*(const f32 a, const vec2& v)
-{
-    return vec2(a * v.v[0], a * v.v[1]);
-}
+inline vec2 operator*(const f32 a, const vec2& v) { return vec2(a * v.v[0], a * v.v[1]); }

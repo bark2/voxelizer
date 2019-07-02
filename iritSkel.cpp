@@ -108,12 +108,12 @@ CGSkelDumpOneTraversedObject(IPObjectStruct* PObj, IrtHmgnMatType Mat, void* Dat
  * RETURN VALUE:                                                              *
  *   bool:		false - fail, true - success.                                *
  *****************************************************************************/
-std::vector<Triangle> triangles;
-vec3 scene_aabb_min { std::numeric_limits<f32>::max() };
-vec3 scene_aabb_max { -std::numeric_limits<f32>::max() };
 bool
 CGSkelStoreData(IPObjectStruct* PObj)
 {
+    extern vec3 scene_aabb_min;
+    extern vec3 scene_aabb_max;
+    extern std::vector<Triangle> triangles;
     int i;
     const char* Str;
     double RGB[3], Transp;
@@ -166,12 +166,17 @@ CGSkelStoreData(IPObjectStruct* PObj)
         int vi = 0;
         PVertex = PPolygon->PVertex;
         do {
-            // if (vi == 3) std::raise(SIGINT);
-
             for (int j = 0; j < 3; j++) {
                 f32 x = static_cast<f32>(PVertex->Coord[j]);
-                scene_aabb_max[j] = std::max(scene_aabb_max[i], x);
-                scene_aabb_min[j] = std::min(scene_aabb_min[i], x);
+                // printf("scene abb min: %f %f %f\n", scene_aabb_min[0], scene_aabb_min[1],
+                // scene_aabb_min[2]);
+
+                // if (scene_aabb_max[j] < x) printf("scene abb max[%d]: %f %f\n", j, scene_aabb_max[j],
+                // x); if (scene_aabb_min[j] > x) printf("scene abb min[%d]: %f %f\n", j,
+                // scene_aabb_min[j], x);
+
+                scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
+                scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
                 if (vi < 3)
                     t[vi][j] = x;
                 else {
@@ -181,10 +186,7 @@ CGSkelStoreData(IPObjectStruct* PObj)
             }
 
             vi++;
-            if (vi >= 3) {
-                triangles.push_back(t);
-                // for (int i = 0; i < 3; i++) printf("t[%d] = %f %f %f\n", i, t[i][0], t[i][1], t[i][2]);
-            }
+            if (vi >= 3) triangles.push_back(t);
 
             PVertex = PVertex->Pnext;
         } while (PVertex != PPolygon->PVertex && PVertex != NULL);

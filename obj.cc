@@ -312,8 +312,8 @@ export_magicavoxel(const std::string& filename,
                                 } break; // gray
                                 case Voxel::BOTH: color = 248; break;
                                 default: {
-                                    printf("%d\n", grid.at(at).max_type);
-                                    assert(0);
+                                    // printf("%d\n", grid.at(at).max_type);
+                                    std::raise(SIGINT);
                                 }
                                 }
                                 u32 position_color = ((x * scaling[0] + i) << 24) +
@@ -325,5 +325,36 @@ export_magicavoxel(const std::string& filename,
 
     fwrite(buffer.data(), sizeof(u32), buffer.size(), out);
     fclose(out);
+    return 0;
+}
+
+int
+export_raw(const std::vector<Voxel>& grid, array<i32, 3> grid_size)
+{
+    // printf("%d %d %d\n", grid_size[0], grid_size[1], grid_size[2]);
+    for (i32 x = 0; x < grid_size[0]; x++)
+        for (i32 y = 0; y < grid_size[1]; y++)
+            for (i32 z = 0; z < grid_size[2]; z++) {
+                u32 at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
+                u8 color;
+                if (!grid.at(at).valid) {
+                    putchar('0');
+                } else {
+                    putchar('1');
+                    switch (grid.at(at).max_type) {
+                    case Voxel::OPENING: color = 121; break;
+                    case Voxel::CLOSING: color = 15; break;
+                    case Voxel::NONE: {
+                        color = 1;
+                        printf("NONE: %d %d %d\n", x, y, z);
+                    } break; // gray
+                    case Voxel::BOTH: color = 248; break;
+                    default: {
+                        assert(0);
+                    }
+                    }
+                    putchar(color);
+                }
+            }
     return 0;
 }

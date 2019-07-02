@@ -25,18 +25,8 @@ struct Vertex {
     vec2 uv;
 };
 
-struct Triangle : array<vec3, 3> {
-    vec3 normal() const;
-
-    template <typename F>
-    Triangle
-    gen(const F& fun) const
-    {
-        Triangle t;
-        for (int i = 0; i < 3; i++) t[i] = fun(this->at(i));
-        return t;
-    }
-};
+using Triangle = array<vec3,3>;
+vec3 normal(const Triangle& t);
 
 struct Mesh {
     std::vector<Vertex> vertices;
@@ -50,87 +40,3 @@ struct Voxel {
     f32 max_intersection_off;
 };
 
-template <typename Vec>
-inline Vec
-to_xy(const Vec& v)
-{
-    return { v[0], v[1], v[2] };
-};
-template <typename Vec>
-inline Vec
-to_yz(const Vec& v)
-{
-    return { v[1], v[2], v[0] };
-};
-template <typename Vec>
-inline Vec
-to_zx(const Vec& v)
-{
-    return { v[2], v[0], v[1] };
-};
-template <typename Vec>
-inline Vec
-inversed_xy(const Vec& v)
-{
-    return { v[0], v[1], v[2] };
-};
-template <typename Vec>
-inline Vec
-inversed_yz(const Vec& v)
-{
-    return { v[2], v[0], v[1] };
-};
-template <typename Vec>
-inline Vec
-inversed_zx(const Vec& v)
-{
-    return { v[1], v[2], v[0] };
-};
-template <typename Vec> using Swizzler = Vec (*)(const Vec&);
-
-template <typename Vec>
-Swizzler<Vec>
-get_swizzler(u32 i)
-{
-    Swizzler<Vec> result;
-    switch (i) {
-    case 0: {
-        result = to_yz;
-    } break;
-    case 1: {
-        result = to_zx;
-    }; break;
-    case 2: {
-        result = to_xy;
-    } break;
-    default: assert(false && "swizzling with wrong index");
-    }
-    return result;
-}
-template <typename Vec>
-Swizzler<Vec>
-get_inv_swizzler(u32 i)
-{
-    Swizzler<Vec> result;
-    switch (i) {
-    case 0: {
-        result = inversed_yz;
-    } break;
-    case 1: {
-        result = inversed_zx;
-    }; break;
-    case 2: {
-        result = inversed_xy;
-    } break;
-    default: assert(false && "swizzling with wrong index");
-    }
-    return result;
-}
-
-template <typename Vec3>
-Vec3
-swizzle(Vec3 v)
-{
-    for (int i = 0; i < 2; i++) std::swap(v[i], v[i + 1]);
-    return v;
-}
