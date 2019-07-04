@@ -115,16 +115,6 @@ grid_cut(std::vector<Voxel>& grid,
     }
 }
 
-/*
- I had like to see a C/C++ package that compiles under Windows and under Linux, that reads IRIT data
-(you can leave the obj input if you like) and dumps (n*m*k) zeros/ones, one per line in lexicographic
-order (k first).  The user should provide the n, m, k values.  As another option, dump only the
-voxels that interest the polygonal input.
-*/
-
-// TODO: read IRIT data
-// TODO: check the bloodfill
-
 vec3 scene_aabb_min;
 vec3 scene_aabb_max;
 std::vector<Triangle> triangles;
@@ -164,12 +154,12 @@ main(int argc, char* argv[])
     scene_aabb_max = { -std::numeric_limits<f32>::max(), -std::numeric_limits<f32>::max(),
                        -std::numeric_limits<f32>::max() };
     if (false) {
-        const char* file_name = "data/BasicModels/cube.itd";
-        // const char* file_name = "data/cow.itd";
+        // const char* file_name = "data/BasicModels/cube.itd";
+        const char* file_name = "data/cow.itd";
         CGSkelProcessIritDataFiles((const char* const*)&file_name, 1);
     } else {
-        // const auto meshes = ai_load_obj_file("data/lowpolydeer/deer.obj");
-        const auto meshes = ai_load_obj_file("data/kitten.obj");
+        const auto meshes = ai_load_obj_file("data/lowpolydeer/deer.obj");
+        // const auto meshes = ai_load_obj_file("data/kitten.obj");
         // const auto meshes = ai_load_obj_file("data/bunny.obj");
         std::size_t triangles_num = 0;
         for (auto& mesh : meshes) triangles_num += mesh.vertices.size() / 3;
@@ -206,7 +196,6 @@ main(int argc, char* argv[])
             v = swizzle(v, 2);
             for (i32 i = 0; i < 3; i++)
                 v[i] = (grid_size[i] - 1.0f) * (v[i] - scene_aabb_min[i]) /
-
                        (scene_aabb_max_max - scene_aabb_min_min);
         }
     }
@@ -236,16 +225,13 @@ main(int argc, char* argv[])
                     vec3 min_voxel = vec3(x, y, z);
                     array<vec3, 2> aabb = { min_voxel, min_voxel + 1.0f };
                     auto option = Intersection_Option::RETURN_INTERSECTOIN_POINT;
-
-                    auto intersecting =
-                        triangle_aabb_collision(t, aabb, triangle_square_fconservative_collision,
-                                                option);
+                    auto intersecting = triangle_aabb_collision(t, aabb, option);
 
                     if (intersecting.first && option == Intersection_Option::RETURN_INTERSECTOIN_POINT) {
                         auto& voxel = grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z);
+                        // assert(
+                            // (intersecting.second >= 0.0f && intersecting.second <= grid_size[2] - 1.0f));
                         if (intersecting.second < voxel.max_intersection_off) continue;
-                        assert(intersecting.second >= 0.0f &&
-                               intersecting.second <= grid_size[2] - 1.0f);
 
                         Voxel::Type type;
                         if (triangle_normal.z == 0.0f)
@@ -278,11 +264,6 @@ main(int argc, char* argv[])
 
     mesh_center = { mesh_center[0] / voxels_n, mesh_center[1] / voxels_n, mesh_center[2] / voxels_n };
 
-    // flood fill
-    // array<i32, 3> threshold = { 0, grid_size[1] / 2, 0 };
-    array<i32, 3> threshold = { 0, 0, 0 };
-
-    // x axis is the scanline direction
     if (do_flood_fill_rast)
         flood_fill_rast(grid, grid_size, voxels_n);
     else if (do_flood_fill_rec)

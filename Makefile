@@ -6,10 +6,10 @@ include $(IRIT_DIR)/makeflag.unx
 
 .SUFFIXES =
 CC         = clang++
-CFLAGS = -W -O0 -g -std=c++11
+CFLAGS = -W -O2 -g -std=c++11
 LIBS = -lassimp -lstdc++
 
-all: vox test1 test2
+all: clean vox test1 test2
 	./test
 
 vox: voxelizer.o obj.o triangle.o common.o iritSkel.cpp math.h

@@ -308,7 +308,7 @@ export_magicavoxel(const std::string& filename,
                                 case Voxel::CLOSING: color = 15; break;
                                 case Voxel::NONE: {
                                     color = 1;
-                                    printf("NONE: %d %d %d\n", x, y, z);
+                                    // printf("NONE: %d %d %d\n", x, y, z);
                                 } break; // gray
                                 case Voxel::BOTH: color = 248; break;
                                 default: {
@@ -346,7 +346,7 @@ export_raw(const std::vector<Voxel>& grid, array<i32, 3> grid_size)
                     case Voxel::CLOSING: color = 15; break;
                     case Voxel::NONE: {
                         color = 1;
-                        printf("NONE: %d %d %d\n", x, y, z);
+                        // printf("NONE: %d %d %d\n", x, y, z);
                     } break; // gray
                     case Voxel::BOTH: color = 248; break;
                     default: {

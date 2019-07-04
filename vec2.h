@@ -7,8 +7,6 @@
 using f32 = float;
 
 struct vec2 {
-    typedef std::size_t size_type;
-
     union {
         f32 v[2];
         struct {
@@ -16,11 +14,27 @@ struct vec2 {
         };
     };
 
+    typedef std::size_t size_type;
+
     vec2() {};
     vec2(f32 x, f32 y)
     {
         v[0] = x;
         v[1] = y;
+    }
+
+    typedef f32* iterator_type;
+
+    iterator_type
+    begin()
+    {
+        return v;
+    }
+
+    iterator_type
+    end()
+    {
+        return v + size();
     }
 
     inline size_type

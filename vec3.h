@@ -9,14 +9,27 @@
 using f32 = float;
 
 struct vec3 {
-    typedef std::size_t size_type;
-
     union {
         f32 v[3];
         struct {
             f32 x, y, z;
         };
     };
+
+    typedef std::size_t size_type;
+    typedef f32* iterator_type;
+
+    iterator_type
+    begin()
+    {
+        return v;
+    }
+
+    iterator_type
+    end()
+    {
+        return v + size();
+    }
 
     vec3() {};
     vec3(f32 v0, f32 v1, f32 v2)
