@@ -5,9 +5,9 @@ IRIT_DIR = /home/bar/Programming/Projects/voxelizer/irit/irit-sm
 include $(IRIT_DIR)/makeflag.unx
 
 .SUFFIXES =
-CC         = clang++
+CC         = g++
 CFLAGS = -W -O2 -g -std=c++11
-LIBS = -lassimp -lstdc++
+LIBS = -lassimp
 
 all: clean vox test1 test2
 	./test

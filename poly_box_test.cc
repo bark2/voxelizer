@@ -54,28 +54,5 @@ get_cmd(char** begin, char** end, const std::string& option)
 int
 main(int argc, char* argv[])
 {
-    bool verbose = get_cmd(argv, argv + argc, "--verbose");
-
-    auto option = Intersection_Option::RETURN_INTERSECTOIN_POINT;
-
-    // Defining polygon vertices in clockwise order
-    int poly_size = 3;
-    int poly_points[9][2] = { { 5, -1 }, { 11, 5 }, { 5, 9 } };
-
-    // Defining clipper polygon vertices in clockwise order
-    // 1st Example with square clipper
-    int clipper_size = 4;
-    int clipper_points[][2] = { { 0, 0 }, { 10, 0 }, { 10, 10 }, { 10, 0 } };
-    // 2nd Example with triangle clipper
-    // int clipper_size = 3;
-    // int clipper_points[][2] = { { 100, 300 }, { 300, 300 }, { 200, 100 } };
-
-    array<vec3, 2> box = { vec3 { 0.0f, 0.0f, 0.0f }, { 10.0f, 10.0f, 10.0f } };
-    array<vec3, 3> t;
-    for (int i = 0; i < poly_size; i++)
-        t[i] = { static_cast<f32>(poly_points[i][0]), static_cast<f32>(poly_points[i][1]), 5.0f };
-
-    triangle_aabb_collision(t, box, option);
-
     return 0;
 }

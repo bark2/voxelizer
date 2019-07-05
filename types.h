@@ -25,7 +25,7 @@ struct Vertex {
     vec2 uv;
 };
 
-using Triangle = array<vec3,3>;
+using Triangle = array<vec3, 3>;
 vec3 normal(const Triangle& t);
 
 struct Mesh {
@@ -34,9 +34,9 @@ struct Mesh {
     bool has_uvs;
 };
 
+// TODO: split to two types, while the other contains *only* the type
 struct Voxel {
     bool valid;
     enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
     f32 max_intersection_off;
 };
-

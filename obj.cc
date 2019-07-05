@@ -304,12 +304,12 @@ export_magicavoxel(const std::string& filename,
                             for (u8 k = 0; k < scaling[2]; k++) {
                                 u8 color;
                                 switch (grid.at(at).max_type) {
-                                case Voxel::OPENING: color = 121; break;
-                                case Voxel::CLOSING: color = 15; break;
-                                case Voxel::NONE: {
-                                    color = 1;
-                                    // printf("NONE: %d %d %d\n", x, y, z);
-                                } break; // gray
+                                // case Voxel::OPENING: color = 121; break;
+                                case Voxel::OPENING: color = 1; break;
+                                // case Voxel::CLOSING: color = 28; break;
+                                // case Voxel::NONE: color = 28; break;
+                                case Voxel::CLOSING: color = 112; break;
+                                case Voxel::NONE: color = 112; break; // gray
                                 case Voxel::BOTH: color = 248; break;
                                 default: {
                                     // printf("%d\n", grid.at(at).max_type);
