@@ -2,6 +2,7 @@
 
 #include "vec2.h"
 #include <cassert>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
@@ -149,6 +150,7 @@ inline vec3 operator*(const vec3& v1, const vec3& v2)
 inline vec3
 operator/(const vec3& v1, const vec3& v2)
 {
+    // assert(v2[0] && v2[1] && v2[2]); //FIXME
     return vec3(v1.v[0] / v2.v[0], v1.v[1] / v2.v[1], v1.v[2] / v2.v[2]);
 }
 

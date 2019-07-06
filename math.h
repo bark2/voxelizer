@@ -102,7 +102,15 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line)
 {
     auto plane_intersection = line_plane_intersection(triangle, line);
     if (!plane_intersection.first) return { false, {} };
-    if (plane_intersection.second < 0.0f) {
+
+    bool is_point_in_triangle = false;
+    vec3 p;
+    if (!(plane_intersection.second < 0.0f)) {
+        p = line[0] + plane_intersection.second * (line[1] - line[0]);
+        vec3 barycentrics = get_barycentric(triangle, p);
+        is_point_in_triangle = std::all_of(std::begin(barycentrics), std::end(barycentrics),
+                                           [](f32 x) { return (x >= 0.0f && x <= 1.0f); });
+    } else {
         /* the line lies on t's plane
          * both or only one point could be in t
          * if both of them in t: return the max
@@ -114,25 +122,29 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line)
                                              [](f32 x) { return (x >= 0.0f && x <= 1.0f); });
         bool is_l1_in_triangle = std::all_of(std::begin(barycentrics_l1), std::end(barycentrics_l1),
                                              [](f32 x) { return (x >= 0.0f && x <= 1.0f); });
-        if (!is_l0_in_triangle && !is_l1_in_triangle) {
-            return { false, {} };
-        } else if (is_l0_in_triangle != is_l1_in_triangle) {
-            // p = l0 + x * (l1-l0) => x = -l0 / (l1 - l0) in the triangle's edges
-            vec3 v = -barycentrics_l0[0] / (barycentrics_l1[1] - barycentrics_l0[0]);
-            for (auto&& x : v)
-                if (x >= 0.0f && x <= 1.0f)
-                    return { true, barycentrics_l0[0] + x * (barycentrics_l1[1] - barycentrics_l0[0]) };
-            // assert(0); // FIXME
-            return { false, {} };
+        if (is_l0_in_triangle && is_l1_in_triangle) {
+            p = line[0].z > line[1].z ? line[0] : line[1];
+            is_point_in_triangle = true;
         } else {
-            auto max_point = line[0].z > line[1].z ? line[0] : line[1];
-            return { true, max_point };
+            // p = l0 + x * (l1-l0) => x = -l0 / (l1 - l0) in the triangle's edges
+            vec3 v = barycentrics_l0 / (barycentrics_l0 - barycentrics_l1);
+            for (auto&& x : v) {
+                if (x < 0.0f && x > 1.0f) continue;
+                vec3 barycentrics = barycentrics_l0 + x * (barycentrics_l1 - barycentrics_l0);
+                if (std::all_of(barycentrics.begin(), barycentrics.end(),
+                                [](f32 x) { return x >= 0.0f && x <= 1.0f; })) {
+                    p = barycentrics.x * triangle[0] + barycentrics.y * triangle[1] +
+                        barycentrics.z * triangle[2];
+                    is_point_in_triangle = true;
+                    // printf("l0: %s\tl1: %s\nv: %s\tx: %f\tbarycentrics: %s\t",
+                    // barycentrics_l0.to_string().c_str(), barycentrics_l1.to_string().c_str(),
+                    // v.to_string().c_str(), x, barycentrics.to_string().c_str());
+                }
+            }
+            // assert(0); // FIXME
         }
     }
-    vec3 p = line[0] + plane_intersection.second * (line[1] - line[0]);
-    vec3 barycentrics = get_barycentric(triangle, p);
-    bool is_point_in_triangle = std::all_of(std::begin(barycentrics), std::end(barycentrics),
-                                            [](f32 x) { return (x >= 0.0f && x <= 1.0f); });
+
     return { is_point_in_triangle, p };
 }
 
@@ -252,7 +264,7 @@ template <bool Print>
 bool
 is_point_in_aabb(const array<vec3, 2>& aabb, const vec3& v)
 {
-    if (Print) printf("%s\n", v.to_string().c_str());
+    if (Print) printf("aabbb: %s p: %s\n", aabb[0].to_string().c_str(), v.to_string().c_str());
     return (v.x >= aabb[0].x && v.y >= aabb[0].y && v.z >= aabb[0].z && v.x <= aabb[1].x &&
             v.y <= aabb[1].y && v.z <= aabb[1].z);
 }
@@ -306,15 +318,19 @@ find_triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb)
 
     for (auto&& e : aabb_edges) {
         auto intersection = line_triangle_intersection(t, e);
-        if (intersection.first) intersections.push_back(intersection.second);
+        if (intersection.first && is_point_in_aabb<false>(aabb, intersection.second))
+            intersections.push_back(intersection.second);
     }
 
     for (int ti = 0; ti < 3; ti++) {
         array<vec3, 2> edge = { t[ti], t[(ti + 1) % 3] };
         for (auto ei = std::begin(aabb_indices); ei != std::end(aabb_indices); ei += 3) {
-            array<vec3, 3> t = { aabb_vertices[ei[0]], aabb_vertices[ei[1]], aabb_vertices[ei[2]] };
+
+            array<vec3, 3> t = { aabb_vertices[ei[0]], aabb_vertices[ei[1]],
+                                 aabb_vertices[ei[2]] }; // FIXME
             auto intersection = line_triangle_intersection(t, edge);
-            if (intersection.first) intersections.push_back(intersection.second);
+            if (intersection.first && is_point_in_aabb<false>(aabb, intersection.second))
+                intersections.push_back(intersection.second);
         }
     }
 
