@@ -240,7 +240,7 @@ main(int argc, char* argv[])
                             mesh_center[2] += z;
                         }
 
-                        if (true && flood_fill == FType::RAST) {
+                        if (flood_fill == FType::RAST) {
                             const bool bad_point = aabb[0].x == 24 && aabb[0].y == 44 && aabb[0].z == 28;
                             auto intersections = find_triangle_aabb_collision(t, aabb);
                             if (intersections.empty()) continue;
@@ -265,7 +265,7 @@ main(int argc, char* argv[])
                             // enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
 
                             if (bad_point) {
-                                const char* type_str = type == Voxel::OPENING ? "openning" : "closing";
+                                const char* type_str = (type == Voxel::OPENING) ? "openning" : "closing";
                                 printf("max point: %s, type: %s, delta: %f, %s\n",
                                        max_intersection.to_string().c_str(), type_str,
                                        max_intersection.z + epsilon - voxel.max_intersection_off,

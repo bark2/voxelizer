@@ -324,12 +324,16 @@ triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb)
 inline vector<vec3>
 find_triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb, bool verbose = false)
 {
+    // TODO: check the indices
     const array<vec3, 8> aabb_vertices = {
         vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[1].x, aabb[0].y, aabb[1].z },
         { aabb[1].x, aabb[1].y, aabb[1].z },      { aabb[0].x, aabb[1].y, aabb[1].z },
         { aabb[0].x, aabb[0].y, aabb[0].z },      { aabb[1].x, aabb[0].y, aabb[0].z },
         { aabb[1].x, aabb[1].y, aabb[0].z },      { aabb[0].x, aabb[1].y, aabb[0].z }
     };
+
+    array<size_t, 36> aabb_indices = { 0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1, 7, 6, 5, 5, 4, 7,
+                                       4, 0, 3, 3, 7, 4, 4, 5, 1, 1, 0, 4, 3, 2, 6, 6, 7, 3 };
 
     array<vec3, 2> aabb_edges[] = {
         { aabb[0], { aabb[1].x, aabb[0].y, aabb[0].z } },
@@ -350,8 +354,6 @@ find_triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb, bool
         { vec3 { aabb[1].x, aabb[0].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[1].z } }
     };
 
-    array<size_t, 36> aabb_indices = { 0, 1, 2, 2, 3, 0, 1, 5, 6, 6, 2, 1, 7, 6, 5, 5, 4, 7,
-                                       4, 0, 3, 3, 7, 4, 4, 5, 1, 1, 0, 4, 3, 2, 6, 6, 7, 3 };
     vector<vec3> intersections;
     intersections.reserve(9);
     for (auto&& e : aabb_edges) {
@@ -359,12 +361,50 @@ find_triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb, bool
         if (intersection.first) intersections.push_back(intersection.second);
     }
 
+    // for (int ti = 0; ti < 3; ti++) {
+    //     array<vec3, 2> edge = { t[ti], t[(ti + 1) % 3] };
+    //     for (auto ei = std::begin(aabb_indices); ei != std::end(aabb_indices); ei += 3) {
+    //         array<vec3, 3> t = { aabb_vertices[ei[0]], aabb_vertices[ei[1]], aabb_vertices[ei[2]] };
+    //         auto intersection = line_triangle_intersection(t, edge, verbose);
+    //         if (intersection.first) intersections.push_back(intersection.second);
+    //     }
+    // }
+
     for (int ti = 0; ti < 3; ti++) {
         array<vec3, 2> edge = { t[ti], t[(ti + 1) % 3] };
-        for (auto ei = std::begin(aabb_indices); ei != std::end(aabb_indices); ei += 3) {
-            array<vec3, 3> t = { aabb_vertices[ei[0]], aabb_vertices[ei[1]], aabb_vertices[ei[2]] };
-            auto intersection = line_triangle_intersection(t, edge, verbose);
-            if (intersection.first) intersections.push_back(intersection.second);
+        for (int axis = 0; axis < 3; axis++) {
+            int maxi = (edge[0][axis] > edge[1][axis]) ? 0 : 1;
+            int mini = (edge[0][axis] < edge[1][axis]) ? 0 : 1;
+
+            f32 p;
+            if (edge[mini][axis] <= aabb[0][axis] && aabb[0][axis] <= edge[maxi][axis])
+                p = aabb[0][axis];
+            else if (edge[mini][axis] <= aabb[1][axis] && aabb[1][axis] <= edge[maxi][axis])
+                p = aabb[1][axis];
+            else
+                continue;
+
+            if (edge[0][axis] == edge[1][axis]) {
+                auto b1 = is_point_in_aabb<false>(aabb, edge[0][axis]);
+                auto b2 = is_point_in_aabb<false>(aabb, edge[1][axis]);
+                if (b1 && b2) {
+                    intersections.push_back(edge[0]);
+                    intersections.push_back(edge[1]);
+                } else if (b1 != b2) {
+                    if (axis != 2)
+                        intersections.push_back(edge[0]);
+                    else {
+                        if (p == aabb[1][axis])
+                            intersections.push_back(aabb[1]);
+                        else
+                            intersections.push_back(edge[maxi]);
+                    }
+                }
+            }
+
+            f32 t = (p - edge[0][axis]) / (edge[1][axis] - edge[0][axis]);
+            vec3 point_on_edge = edge[0] + t * (edge[1] - edge[0]);
+            if (is_point_in_aabb<false>(aabb, point_on_edge)) intersections.push_back(point_on_edge);
         }
     }
 
