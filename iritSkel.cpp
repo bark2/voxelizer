@@ -168,13 +168,6 @@ CGSkelStoreData(IPObjectStruct* PObj)
         do {
             for (int j = 0; j < 3; j++) {
                 f32 x = static_cast<f32>(PVertex->Coord[j]);
-                // printf("scene abb min: %f %f %f\n", scene_aabb_min[0], scene_aabb_min[1],
-                // scene_aabb_min[2]);
-
-                // if (scene_aabb_max[j] < x) printf("scene abb max[%d]: %f %f\n", j, scene_aabb_max[j],
-                // x); if (scene_aabb_min[j] > x) printf("scene abb min[%d]: %f %f\n", j,
-                // scene_aabb_min[j], x);
-
                 scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
                 scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
                 if (vi < 3)

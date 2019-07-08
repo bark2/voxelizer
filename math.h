@@ -8,6 +8,8 @@
 #include <tuple>
 #include <utility>
 
+const f32 epsilon = 0.000001;
+
 template <typename Vec>
 Vec
 swizzle(Vec v, int n = 1)
@@ -164,6 +166,7 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line,
                     break;
                 }
             }
+	    // FIXME: vensum model
             assert(is_l0_in_triangle != is_l1_in_triangle);
         }
     }

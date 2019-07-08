@@ -156,7 +156,9 @@ main(int argc, char* argv[])
     scene_aabb_max = { -std::numeric_limits<f32>::max(), -std::numeric_limits<f32>::max(),
                        -std::numeric_limits<f32>::max() };
     if (strstr(filename, ".itd")) {
-        CGSkelProcessIritDataFiles((const char* const*)&filename, 1);
+        const char* file_name = "data/cow.itd";
+        CGSkelProcessIritDataFiles((const char* const*)&file_name, 1);
+        // CGSkelProcessIritDataFiles((const char* const*)&filename, 1);
     } else {
         const auto meshes = ai_load_obj_file(filename);
         // const auto meshes = ai_load_obj_file("data/deer.obj");
@@ -242,7 +244,7 @@ main(int argc, char* argv[])
                         }
 
                         if (flood_fill == FType::RAST) {
-                            const bool bad_point = aabb[0].x == 3 && aabb[0].y == 64 && aabb[0].z == 78;
+                            const bool bad_point = false;
                             auto intersections = find_triangle_aabb_collision(t, aabb);
                             if (intersections.empty()) continue;
 
@@ -251,7 +253,6 @@ main(int argc, char* argv[])
                                                   [](const vec3& l, const vec3& r) {
                                                       return l.z < r.z;
                                                   });
-
                             Voxel::Type type;
                             if (triangle_normal.z == 0.0f)
                                 type = Voxel::BOTH;
@@ -261,24 +262,21 @@ main(int argc, char* argv[])
                                 type = Voxel::CLOSING;
                             // enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
 
-                            if (bad_point) {
-                                for (auto& v : intersections) {
-                                    printf("v: %s\n", v.to_string().c_str());
-                                }
-                                printf("max intersection: %s, type: %d\n",
-                                       max_intersection.to_string().c_str(), type);
+                            if (bad_point && type == Voxel::OPENING) {
+                                printf("delta: %f, %s\n",
+                                       max_intersection.z + epsilon - voxel.max_intersection_off,
+                                       max_intersection.z + epsilon < voxel.max_intersection_off
+                                           ? "smaller than before"
+                                           : "bigger than before");
                             }
-                            if (max_intersection.z < voxel.max_intersection_off) continue;
+                            if (max_intersection.z + epsilon < voxel.max_intersection_off) continue;
 
-                            if (!voxel.valid) {
-                                voxel.max_intersection_off = max_intersection.z;
-                                voxel.max_type = type;
-                            } else if (max_intersection.z > voxel.max_intersection_off) {
+                            if (!voxel.valid || max_intersection.z > voxel.max_intersection_off) {
                                 voxel.max_type = type;
                                 voxel.max_intersection_off = max_intersection.z;
-                            } else if (max_intersection.z == voxel.max_intersection_off &&
-                                       type == Voxel::CLOSING) {
+                            } else if (type == Voxel::CLOSING) { // with delta
                                 voxel.max_type = type;
+                                voxel.max_intersection_off = max_intersection.z + epsilon;
                             }
                         }
                     }
@@ -287,12 +285,12 @@ main(int argc, char* argv[])
         }
     }
 
-    mesh_center = { mesh_center[0] / voxels_n, mesh_center[1] / voxels_n, mesh_center[2] / voxels_n };
+    // mesh_center = { mesh_center[0] / voxels_n, mesh_center[1] / voxels_n, mesh_center[2] / voxels_n };
 
     switch (flood_fill) {
     case FType::RAST: flood_fill_rast(grid, grid_size, voxels_n); break;
     case FType::REC:
-        flood_fill_rec(grid, grid_size, voxels_n, mesh_center[0], mesh_center[1], mesh_center[2]);
+        // flood_fill_rec(grid, grid_size, voxels_n, mesh_center[0], mesh_center[1], mesh_center[2]);
         break;
     case FType::INV: flood_fill_inv(grid, grid_size, voxels_n); break;
     default:;
