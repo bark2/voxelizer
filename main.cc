@@ -157,7 +157,7 @@ main(int argc, char* argv[])
     scene_aabb_max = { -std::numeric_limits<f32>::max(), -std::numeric_limits<f32>::max(),
                        -std::numeric_limits<f32>::max() };
     if (strstr(filename, ".itd")) {
-      if (!CGSkelProcessIritDataFiles((const char*)filename)) {
+        if (!CGSkelProcessIritDataFiles((const char*)filename)) {
             printf("Input Error: export\n");
             return 1;
         }
@@ -240,11 +240,16 @@ main(int argc, char* argv[])
                             mesh_center[2] += z;
                         }
 
-                        if (flood_fill == FType::RAST) {
-                            const bool bad_point = false;
+                        if (true && flood_fill == FType::RAST) {
+                            const bool bad_point = aabb[0].x == 24 && aabb[0].y == 44 && aabb[0].z == 28;
                             auto intersections = find_triangle_aabb_collision(t, aabb);
                             if (intersections.empty()) continue;
 
+                            if (bad_point) {
+                                for (auto& v : intersections) {
+                                    printf("inter point: %s\n", v.to_string().c_str());
+                                }
+                            }
                             auto max_intersection =
                                 *std::max_element(intersections.cbegin(), intersections.cend(),
                                                   [](const vec3& l, const vec3& r) {
@@ -259,8 +264,10 @@ main(int argc, char* argv[])
                                 type = Voxel::CLOSING;
                             // enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
 
-                            if (bad_point && type == Voxel::OPENING) {
-                                printf("delta: %f, %s\n",
+                            if (bad_point) {
+                                const char* type_str = type == Voxel::OPENING ? "openning" : "closing";
+                                printf("max point: %s, type: %s, delta: %f, %s\n",
+                                       max_intersection.to_string().c_str(), type_str,
                                        max_intersection.z + epsilon - voxel.max_intersection_off,
                                        max_intersection.z + epsilon < voxel.max_intersection_off
                                            ? "smaller than before"
@@ -271,9 +278,9 @@ main(int argc, char* argv[])
                             if (!voxel.valid || max_intersection.z > voxel.max_intersection_off) {
                                 voxel.max_type = type;
                                 voxel.max_intersection_off = max_intersection.z;
-                            } else if (type == Voxel::CLOSING) { // with delta
+                            } else if (type == Voxel::CLOSING) { // epsilon included
                                 voxel.max_type = type;
-                                voxel.max_intersection_off = max_intersection.z + epsilon;
+                                voxel.max_intersection_off = max_intersection.z;
                             }
                         }
                     }

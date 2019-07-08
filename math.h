@@ -129,8 +129,8 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line,
 {
     static bool degenerated_triangle_already_errored = false;
     static bool bary_already_errored = false;
-    if (!degenerated_triangle_already_errored && triangle[0] != triangle[1] &&
-        triangle[1] != triangle[2] && triangle[0] != triangle[2]) {
+    if (!degenerated_triangle_already_errored &&
+        !(triangle[0] != triangle[1] && triangle[1] != triangle[2] && triangle[0] != triangle[2])) {
         fprintf(stdout, "degenerated triangle detected, could cause flood-fill error\n");
         degenerated_triangle_already_errored = true;
     }
@@ -162,21 +162,23 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line,
         } else {
             // p = l0 + t * (l1-l0) => t = l0 / (l0 - l1) in the triangle's edges
             vec3 t = bary_l0 / (bary_l0 - bary_l1);
+            // for outside line could be two intersection points
+            array<vec3, 2> intersections = {};
             for (auto&& x : t) {
                 vec3 bary = bary_l0 + x * (bary_l1 - bary_l0);
-                // point inside the line which one of its coords is zero, could still be ouside of the
-                // triangle
-                auto outside_triangle = std::all_of(bary.begin(), bary.end(), is_rat);
-                if (outside_triangle) continue;
+                if (std::any_of(bary.begin(), bary.end(), [](f32 x) { return !is_rat(x); })) continue;
 
                 intersecting = true;
-                p = bary.x * triangle[0] + bary.y * triangle[1] + bary.z * triangle[2];
-                break;
+                intersections[intersecting ? 1 : 0] =
+                    bary.x * triangle[0] + bary.y * triangle[1] + bary.z * triangle[2];
             }
+            p = (intersections[0].z < intersections[1].z) ? intersections[0] : intersections[1];
             // FIXME: vensum model
             // assert(is_l0_in_triangle != is_l1_in_triangle);
-            if (!bary_already_errored && is_l0_in_triangle != is_l1_in_triangle) {
-                printf("bad intersection\n");
+
+            auto is_line_outside = is_l0_in_triangle == is_l1_in_triangle;
+            if (!bary_already_errored && !intersecting && !is_line_outside) {
+                printf("Error: line_triangle_intersection\n");
                 bary_already_errored = true;
             }
         }
