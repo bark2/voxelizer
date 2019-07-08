@@ -155,7 +155,7 @@ main(int argc, char* argv[])
                        std::numeric_limits<f32>::max() };
     scene_aabb_max = { -std::numeric_limits<f32>::max(), -std::numeric_limits<f32>::max(),
                        -std::numeric_limits<f32>::max() };
-    if (strstr(filename,".itd")) {
+    if (strstr(filename, ".itd")) {
         CGSkelProcessIritDataFiles((const char* const*)&filename, 1);
     } else {
         const auto meshes = ai_load_obj_file(filename);
@@ -242,8 +242,15 @@ main(int argc, char* argv[])
                         }
 
                         if (flood_fill == FType::RAST) {
-                            auto max_intersection = find_triangle_aabb_collision(t, aabb);
-                            if (max_intersection < voxel.max_intersection_off) continue;
+                            const bool bad_point = aabb[0].x == 3 && aabb[0].y == 64 && aabb[0].z == 78;
+                            auto intersections = find_triangle_aabb_collision(t, aabb);
+                            if (intersections.empty()) continue;
+
+                            auto max_intersection =
+                                *std::max_element(intersections.cbegin(), intersections.cend(),
+                                                  [](const vec3& l, const vec3& r) {
+                                                      return l.z < r.z;
+                                                  });
 
                             Voxel::Type type;
                             if (triangle_normal.z == 0.0f)
@@ -252,14 +259,24 @@ main(int argc, char* argv[])
                                 type = Voxel::OPENING;
                             else if (triangle_normal.z > 0.0f)
                                 type = Voxel::CLOSING;
+                            // enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
+
+                            if (bad_point) {
+                                for (auto& v : intersections) {
+                                    printf("v: %s\n", v.to_string().c_str());
+                                }
+                                printf("max intersection: %s, type: %d\n",
+                                       max_intersection.to_string().c_str(), type);
+                            }
+                            if (max_intersection.z < voxel.max_intersection_off) continue;
 
                             if (!voxel.valid) {
-                                voxel.max_intersection_off = max_intersection;
+                                voxel.max_intersection_off = max_intersection.z;
                                 voxel.max_type = type;
-                            } else if (max_intersection > voxel.max_intersection_off) {
+                            } else if (max_intersection.z > voxel.max_intersection_off) {
                                 voxel.max_type = type;
-                                voxel.max_intersection_off = max_intersection;
-                            } else if (max_intersection == voxel.max_intersection_off &&
+                                voxel.max_intersection_off = max_intersection.z;
+                            } else if (max_intersection.z == voxel.max_intersection_off &&
                                        type == Voxel::CLOSING) {
                                 voxel.max_type = type;
                             }

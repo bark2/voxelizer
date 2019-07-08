@@ -106,9 +106,21 @@ struct vec3 {
     to_string() const
     {
         using std::to_string;
-        return "( " + to_string(x) + ", " + to_string(y) + ", " + to_string(z) + " )";
+        return "(" + to_string(x) + ", " + to_string(y) + ", " + to_string(z) + ")";
     }
 };
+
+inline bool
+operator==(const vec3& r, const vec3& l)
+{
+  return r[0] == l[0] && r[1] == l[1] && r[2] == l[2];
+}
+
+inline bool
+operator!=(const vec3& r, const vec3& l)
+{
+  return !(r == l);
+}
 
 inline vec3
 operator+(const vec3& v1, f32 a)

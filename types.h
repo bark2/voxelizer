@@ -18,6 +18,7 @@ using f32 = float;
 using f64 = double;
 
 using std::array;
+using std::vector;
 
 struct Vertex {
     vec3 pos;
