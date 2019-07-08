@@ -122,9 +122,10 @@ std::vector<Triangle> triangles;
 int
 main(int argc, char* argv[])
 {
-    char filename[32];
+    char filename[128] = {};
     char** arg_input_file = get_cmd(argv, argv + argc, "--in");
     if (arg_input_file) sscanf(arg_input_file[1], "%s", filename);
+    assert(strlen(filename) < IRIT_LINE_LEN_VLONG - 5);
 
     array<i32, 3> grid_size;
     char** arg_resolution = get_cmd(argv, argv + argc, "--resolution");
@@ -156,16 +157,12 @@ main(int argc, char* argv[])
     scene_aabb_max = { -std::numeric_limits<f32>::max(), -std::numeric_limits<f32>::max(),
                        -std::numeric_limits<f32>::max() };
     if (strstr(filename, ".itd")) {
-        const char* file_name = "data/cow.itd";
-        CGSkelProcessIritDataFiles((const char* const*)&file_name, 1);
-        // CGSkelProcessIritDataFiles((const char* const*)&filename, 1);
+      if (!CGSkelProcessIritDataFiles((const char*)filename)) {
+            printf("Input Error: export\n");
+            return 1;
+        }
     } else {
         const auto meshes = ai_load_obj_file(filename);
-        // const auto meshes = ai_load_obj_file("data/deer.obj");
-        // const auto meshes = ai_load_obj_file("data/venusm.obj");
-        // const auto meshes = ai_load_obj_file("data/dragon.ply");
-        // const auto meshes = ai_load_obj_file("data/kitten.obj");
-        // const auto meshes = ai_load_obj_file("data/bunny.obj");
         std::size_t triangles_num = 0;
         for (auto& mesh : meshes) triangles_num += mesh.vertices.size() / 3;
         triangles.reserve(triangles_num);
@@ -300,7 +297,6 @@ main(int argc, char* argv[])
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));
         if (export_magicavoxel("bunny.vox", grid, grid_size, voxels_n))
             assert(0 && "couldn't not open the vox file");
-        printf("res:\t%u %u %u\n", grid_size[0], grid_size[1], grid_size[2]);
         printf("voxels:\t%u\n", voxels_n);
         if (flood_fill == FType::REC)
             printf("mesh center:\t%u %u %u\n", mesh_center[0], mesh_center[1], mesh_center[2]);

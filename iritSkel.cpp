@@ -43,14 +43,14 @@ IPFreeformConvStateStruct CGSkelFFCState = { FALSE,          /* Talkative */
  *   bool:		false - fail, true - success.                                *
  *****************************************************************************/
 bool
-CGSkelProcessIritDataFiles(const char* const* FileNames, int NumFiles)
+CGSkelProcessIritDataFiles(const char* file_name)
 {
     IPObjectStruct* PObjects;
     IrtHmgnMatType CrntViewMat;
 
     /* Get the data files: */
     IPSetFlattenObjects(FALSE);
-    if ((PObjects = IPGetDataFiles((const char* const*)FileNames, 1 /*NumFiles*/, TRUE, FALSE)) == NULL)
+    if ((PObjects = IPGetDataFiles(&file_name, 1 /*NumFiles*/, TRUE, FALSE)) == NULL)
         return false;
     PObjects = IPResolveInstances(PObjects);
 

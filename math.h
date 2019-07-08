@@ -127,8 +127,14 @@ get_barycentrics_(const Triangle& t, const vec3& p)
 inline std::pair<bool, vec3>
 line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line, bool verbose = false)
 {
-    assert(triangle[0] != triangle[1] && triangle[1] != triangle[2] && triangle[0] != triangle[2] &&
-           "a with mesh degenerated triangle");
+    static bool degenerated_triangle_already_errored = false;
+    static bool bary_already_errored = false;
+    if (!degenerated_triangle_already_errored && triangle[0] != triangle[1] &&
+        triangle[1] != triangle[2] && triangle[0] != triangle[2]) {
+        fprintf(stdout, "degenerated triangle detected, could cause flood-fill error\n");
+        degenerated_triangle_already_errored = true;
+    }
+
     auto plane_intersection = line_plane_intersection(triangle, line);
     if (!plane_intersection.first) {
         if (verbose) printf("no intersection\n");
@@ -154,20 +160,25 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line,
             intersecting = true;
             p = line[0].z > line[1].z ? line[0] : line[1];
         } else {
-            // p = l0 + t * (l1-l0) => t = -l0 / (l1 - l0) in the triangle's edges
+            // p = l0 + t * (l1-l0) => t = l0 / (l0 - l1) in the triangle's edges
             vec3 t = bary_l0 / (bary_l0 - bary_l1);
             for (auto&& x : t) {
-                if (!is_rat(x)) continue;
-                // point inside the line which one of its coords is zero
                 vec3 bary = bary_l0 + x * (bary_l1 - bary_l0);
-                if (std::all_of(bary.begin(), bary.end(), is_rat)) {
-                    intersecting = true;
-                    p = bary.x * triangle[0] + bary.y * triangle[1] + bary.z * triangle[2];
-                    break;
-                }
+                // point inside the line which one of its coords is zero, could still be ouside of the
+                // triangle
+                auto outside_triangle = std::all_of(bary.begin(), bary.end(), is_rat);
+                if (outside_triangle) continue;
+
+                intersecting = true;
+                p = bary.x * triangle[0] + bary.y * triangle[1] + bary.z * triangle[2];
+                break;
             }
-	    // FIXME: vensum model
-            assert(is_l0_in_triangle != is_l1_in_triangle);
+            // FIXME: vensum model
+            // assert(is_l0_in_triangle != is_l1_in_triangle);
+            if (!bary_already_errored && is_l0_in_triangle != is_l1_in_triangle) {
+                printf("bad intersection\n");
+                bary_already_errored = true;
+            }
         }
     }
 
@@ -342,7 +353,7 @@ find_triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb, bool
     vector<vec3> intersections;
     intersections.reserve(9);
     for (auto&& e : aabb_edges) {
-      auto intersection = line_triangle_intersection(t, e, verbose);
+        auto intersection = line_triangle_intersection(t, e, verbose);
         if (intersection.first) intersections.push_back(intersection.second);
     }
 

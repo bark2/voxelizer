@@ -16,7 +16,7 @@
 #include "include/ip_cnvrt.h"
 #include "include/symb_lib.h"
 
-bool CGSkelProcessIritDataFiles(const char* const* FileNames, int NumFiles);
+bool CGSkelProcessIritDataFiles(const char* filename);
 void CGSkelDumpOneTraversedObject(IPObjectStruct *PObj, IrtHmgnMatType Mat, void *Data);
 int CGSkelGetObjectColor(IPObjectStruct *PObj, double RGB[3]);
 const char *CGSkelGetObjectTexture(IPObjectStruct *PObj);
