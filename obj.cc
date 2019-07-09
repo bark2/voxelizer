@@ -309,12 +309,9 @@ export_magicavoxel(const std::string& filename,
                                 // case Voxel::CLOSING: color = 28; break;
                                 // case Voxel::NONE: color = 28; break;
                                 case Voxel::CLOSING: color = 112; break;
-                                case Voxel::NONE: color = 112; break; // gray
+                                case Voxel::NONE: color = 28; break;
                                 case Voxel::BOTH: color = 248; break;
-                                default: {
-                                    // printf("%d\n", grid.at(at).max_type);
-                                    std::raise(SIGINT);
-                                }
+                                default: assert(0);
                                 }
                                 u32 position_color = ((x * scaling[0] + i) << 24) +
                                                      ((y * scaling[1] + j) << 16) +
@@ -349,9 +346,7 @@ export_raw(const std::vector<Voxel>& grid, array<i32, 3> grid_size)
                         // printf("NONE: %d %d %d\n", x, y, z);
                     } break; // gray
                     case Voxel::BOTH: color = 248; break;
-                    default: {
-                        assert(0);
-                    }
+                    default: assert(0);
                     }
                     putchar(color);
                 }

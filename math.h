@@ -1,5 +1,7 @@
 #pragma once
 
+#include "pcube/pcube.h"
+#include "pcube/vec.h"
 #include "types.h"
 #include <algorithm>
 #include <cassert>
@@ -78,6 +80,58 @@ is_point_in_triangle(const array<vec2, 3>& proj_triangle, bool back_facing, cons
     return result;
 }
 
+template <bool Print>
+bool
+is_point_in_aabb(const array<vec3, 2>& aabb, const vec3& v)
+{
+    if (Print) printf("aabbb: %s p: %s\n", aabb[0].to_string().c_str(), v.to_string().c_str());
+    return (v.x >= aabb[0].x && v.y >= aabb[0].y && v.z >= aabb[0].z && v.x <= aabb[1].x &&
+            v.y <= aabb[1].y && v.z <= aabb[1].z);
+}
+
+inline vector<vec3>
+line_aabb_intersection(const array<vec3, 2> aabb, const array<vec3, 2>& line)
+{
+    vector<vec3> intersections;
+
+    for (int axis = 0; axis < 3; axis++) {
+        int maxi = (line[0][axis] > line[1][axis]) ? 0 : 1;
+        int mini = (line[0][axis] < line[1][axis]) ? 0 : 1;
+
+        f32 p;
+        if (line[mini][axis] <= aabb[0][axis] && aabb[0][axis] <= line[maxi][axis])
+            p = aabb[0][axis];
+        else if (line[mini][axis] <= aabb[1][axis] && aabb[1][axis] <= line[maxi][axis])
+            p = aabb[1][axis];
+        else
+            continue;
+
+        if (line[0][axis] == line[1][axis]) {
+            auto b1 = is_point_in_aabb<false>(aabb, line[0]);
+            auto b2 = is_point_in_aabb<false>(aabb, line[1]);
+            if (b1 && b2) {
+                intersections.push_back(line[0]);
+                intersections.push_back(line[1]);
+            } else if (b1 != b2) {
+                if (axis != 2)
+                    intersections.push_back(line[0]);
+                else {
+                    if (p == aabb[1][axis])
+                        intersections.push_back(aabb[1]);
+                    else
+                        intersections.push_back(line[maxi]);
+                }
+            }
+        }
+
+        f32 t = (p - line[0][axis]) / (line[1][axis] - line[0][axis]);
+        vec3 point_on_line = line[0] + t * (line[1] - line[0]);
+        if (is_point_in_aabb<false>(aabb, point_on_line)) intersections.push_back(point_on_line);
+    }
+
+    return intersections;
+}
+
 inline std::pair<bool, f32>
 line_plane_intersection(const array<vec3, 3>& plane, const array<vec3, 2>& line)
 {
@@ -92,7 +146,7 @@ line_plane_intersection(const array<vec3, 3>& plane, const array<vec3, 2>& line)
 }
 
 vec3
-get_barycentrics(const Triangle& t, const vec3& p)
+get_barycentrics_fast(const Triangle& t, const vec3& p)
 {
     vec3 v0 = t[1] - t[0], v1 = t[2] - t[0], v2 = p - t[0];
     f32 d00 = dot(v0, v0);
@@ -101,6 +155,7 @@ get_barycentrics(const Triangle& t, const vec3& p)
     f32 d20 = dot(v2, v0);
     f32 d21 = dot(v2, v1);
     f32 denom = d00 * d11 - d01 * d01;
+    assert(denom);
     f32 v = (d11 * d20 - d01 * d21) / denom;
     f32 w = (d00 * d21 - d01 * d20) / denom;
     f32 u = 1.0f - v - w;
@@ -108,20 +163,26 @@ get_barycentrics(const Triangle& t, const vec3& p)
 }
 
 vec3
-get_barycentrics_(const Triangle& t, const vec3& p)
+get_barycentrics(const Triangle& t, const vec3& p)
 {
     vec3 bary;
     vec3 normal = cross(t[1] - t[0], t[2] - t[0]);
-    // The area of a triangle is
     f32 areaABC = dot(normal, cross((t[1] - t[0]), (t[2] - t[0])));
     f32 areaPBC = dot(normal, cross((t[1] - p), (t[2] - p)));
     f32 areaPCA = dot(normal, cross((t[2] - p), (t[0] - p)));
 
-    bary.x = areaPBC / areaABC;      // alpha
-    bary.y = areaPCA / areaABC;      // beta
-    bary.z = 1.0f - bary.x - bary.y; // gamma
+    bary.x = areaPBC / areaABC;
+    bary.y = areaPCA / areaABC;
+    bary.z = 1.0f - bary.x - bary.y;
 
     return bary;
+}
+
+bool
+is_point_inside_triangle(const Triangle& t, const vec3& p)
+{
+    vec3 bary = get_barycentrics_fast(t, p);
+    return std::all_of(std::begin(bary), std::end(bary), is_rat);
 }
 
 inline std::pair<bool, vec3>
@@ -131,29 +192,24 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line,
     static bool bary_already_errored = false;
     if (!degenerated_triangle_already_errored &&
         !(triangle[0] != triangle[1] && triangle[1] != triangle[2] && triangle[0] != triangle[2])) {
-        fprintf(stdout, "degenerated triangle detected, could cause flood-fill error\n");
+        printf("degenerated triangle detected, could cause flood-fill error\n");
         degenerated_triangle_already_errored = true;
     }
 
     auto plane_intersection = line_plane_intersection(triangle, line);
-    if (!plane_intersection.first) {
-        if (verbose) printf("no intersection\n");
-        return { false, {} };
-    }
+    if (!plane_intersection.first) { return { false, {} }; }
 
     bool intersecting = false;
     vec3 p;
     if (!(plane_intersection.second < 0.0f)) {
         assert(is_rat(plane_intersection.second));
-        if (verbose) printf("normal intersection\n");
         p = line[0] + plane_intersection.second * (line[1] - line[0]);
-        vec3 bary = get_barycentrics(triangle, p);
-        intersecting = std::all_of(std::begin(bary), std::end(bary), is_rat);
+        intersecting = is_point_inside_triangle(triangle, p);
     } else {
         // the line lies on t's plane
         if (verbose) printf("line and triangle in the same plane\n");
-        vec3 bary_l0 = get_barycentrics_(triangle, line[0]);
-        vec3 bary_l1 = get_barycentrics_(triangle, line[1]);
+        vec3 bary_l0 = get_barycentrics(triangle, line[0]);
+        vec3 bary_l1 = get_barycentrics(triangle, line[1]);
         bool is_l0_in_triangle = std::all_of(std::begin(bary_l0), std::end(bary_l0), is_rat);
         bool is_l1_in_triangle = std::all_of(std::begin(bary_l1), std::end(bary_l1), is_rat);
         if (is_l0_in_triangle && is_l1_in_triangle) {
@@ -163,22 +219,27 @@ line_triangle_intersection(const Triangle& triangle, const array<vec3, 2>& line,
             // p = l0 + t * (l1-l0) => t = l0 / (l0 - l1) in the triangle's edges
             vec3 t = bary_l0 / (bary_l0 - bary_l1);
             // for outside line could be two intersection points
-            array<vec3, 2> intersections = {};
-            for (auto&& x : t) {
+            vector<vec3> intersections;
+            intersections.reserve(2);
+            for (auto& x : t) {
+                if (std::isnan(x)) continue;
                 vec3 bary = bary_l0 + x * (bary_l1 - bary_l0);
                 if (std::any_of(bary.begin(), bary.end(), [](f32 x) { return !is_rat(x); })) continue;
-
+                // intersections[intersecting ? 1 : 0] =
+                // bary.x * triangle[0] + bary.y * triangle[1] + bary.z * triangle[2];
                 intersecting = true;
-                intersections[intersecting ? 1 : 0] =
-                    bary.x * triangle[0] + bary.y * triangle[1] + bary.z * triangle[2];
+                intersections.push_back(bary.x * triangle[0] + bary.y * triangle[1] +
+                                        bary.z * triangle[2]);
             }
+            assert(intersections.size() < 3);
+            // printf("%s", intersections.size() == 2 ? "intersections.size() == 2\n" : "");
             p = (intersections[0].z < intersections[1].z) ? intersections[0] : intersections[1];
-            // FIXME: vensum model
-            // assert(is_l0_in_triangle != is_l1_in_triangle);
 
             auto is_line_outside = is_l0_in_triangle == is_l1_in_triangle;
             if (!bary_already_errored && !intersecting && !is_line_outside) {
-                printf("Error: line_triangle_intersection\n");
+                printf("Error: the line found intersecting with the triangle and lies on its plane but "
+                       "no intersections found,  (%s %s)\n",
+                       __FILE__, __LINE__);
                 bary_already_errored = true;
             }
         }
@@ -299,15 +360,6 @@ is_point_in_square(const array<vec2, 2>& square, const vec2& v)
     return (v.x >= square[0].x && v.x <= square[1].x && v.y >= square[0].y && v.y <= square[1].y);
 }
 
-template <bool Print>
-bool
-is_point_in_aabb(const array<vec3, 2>& aabb, const vec3& v)
-{
-    if (Print) printf("aabbb: %s p: %s\n", aabb[0].to_string().c_str(), v.to_string().c_str());
-    return (v.x >= aabb[0].x && v.y >= aabb[0].y && v.z >= aabb[0].z && v.x <= aabb[1].x &&
-            v.y <= aabb[1].y && v.z <= aabb[1].z);
-}
-
 inline bool
 triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb)
 {
@@ -354,58 +406,36 @@ find_triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb, bool
         { vec3 { aabb[1].x, aabb[0].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[1].z } }
     };
 
+    const array<vec3, 2> aabb_diags[4] = {
+        { aabb[0], aabb[1] },
+        { vec3 { aabb[0].x, aabb[1].y, aabb[0].z }, { aabb[0].x, aabb[1].y, aabb[1].z } },
+        { vec3 { aabb[1].x, aabb[0].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[1].z } },
+        { vec3 { aabb[1].x, aabb[1].y, aabb[0].z }, { aabb[1].x, aabb[1].y, aabb[1].z } }
+    };
+
     vector<vec3> intersections;
-    intersections.reserve(9);
+    intersections.reserve(6);
+
     for (auto&& e : aabb_edges) {
-        auto intersection = line_triangle_intersection(t, e, verbose);
-        if (intersection.first) intersections.push_back(intersection.second);
+    auto intersection = line_triangle_intersection(t, e, verbose);
+    if (intersection.first) intersections.push_back(intersection.second);
     }
 
-    // for (int ti = 0; ti < 3; ti++) {
-    //     array<vec3, 2> edge = { t[ti], t[(ti + 1) % 3] };
-    //     for (auto ei = std::begin(aabb_indices); ei != std::end(aabb_indices); ei += 3) {
-    //         array<vec3, 3> t = { aabb_vertices[ei[0]], aabb_vertices[ei[1]], aabb_vertices[ei[2]] };
-    //         auto intersection = line_triangle_intersection(t, edge, verbose);
-    //         if (intersection.first) intersections.push_back(intersection.second);
-    //     }
-    // }
+    // vec3 aabb_center = (aabb[1] - aabb[0]) / 2.0f;
+    // Triangle nt = t;
+    // for (auto& v : nt) v -= aabb_center;
+    // vec3 triangle_normal = cross(nt[1] - nt[0], nt[2] - nt[0]);
+    // array<vec3, 2> best_diag;
+    // for (int axis = 0; axis < 3; axis++) { best_diag[1][axis] = triangle_normal[axis] > 0 ? 1 : -1; }
+    // best_diag[0] = -1.0f * best_diag[1];
+    // auto intersection = line_triangle_intersection(nt, best_diag, verbose);
+    // if (intersection.first) intersections.push_back(intersection.second);
+    // for (auto& i : intersections) i +=aabb_center;
 
     for (int ti = 0; ti < 3; ti++) {
         array<vec3, 2> edge = { t[ti], t[(ti + 1) % 3] };
-        for (int axis = 0; axis < 3; axis++) {
-            int maxi = (edge[0][axis] > edge[1][axis]) ? 0 : 1;
-            int mini = (edge[0][axis] < edge[1][axis]) ? 0 : 1;
-
-            f32 p;
-            if (edge[mini][axis] <= aabb[0][axis] && aabb[0][axis] <= edge[maxi][axis])
-                p = aabb[0][axis];
-            else if (edge[mini][axis] <= aabb[1][axis] && aabb[1][axis] <= edge[maxi][axis])
-                p = aabb[1][axis];
-            else
-                continue;
-
-            if (edge[0][axis] == edge[1][axis]) {
-                auto b1 = is_point_in_aabb<false>(aabb, edge[0][axis]);
-                auto b2 = is_point_in_aabb<false>(aabb, edge[1][axis]);
-                if (b1 && b2) {
-                    intersections.push_back(edge[0]);
-                    intersections.push_back(edge[1]);
-                } else if (b1 != b2) {
-                    if (axis != 2)
-                        intersections.push_back(edge[0]);
-                    else {
-                        if (p == aabb[1][axis])
-                            intersections.push_back(aabb[1]);
-                        else
-                            intersections.push_back(edge[maxi]);
-                    }
-                }
-            }
-
-            f32 t = (p - edge[0][axis]) / (edge[1][axis] - edge[0][axis]);
-            vec3 point_on_edge = edge[0] + t * (edge[1] - edge[0]);
-            if (is_point_in_aabb<false>(aabb, point_on_edge)) intersections.push_back(point_on_edge);
-        }
+        auto inter = line_aabb_intersection(aabb, edge);
+        intersections.insert(intersections.cend(), inter.cbegin(), inter.cend());
     }
 
     return intersections;

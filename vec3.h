@@ -1,8 +1,8 @@
 #pragma once
 
 #include "vec2.h"
-#include <cassert>
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <stdlib.h>
@@ -82,11 +82,26 @@ struct vec3 {
         for (auto& i : v) i -= t;
         return *this;
     }
+
     inline vec3&
     operator/=(f32 t)
     {
         assert(t != 0.0f);
         for (auto& i : v) i /= t;
+        return *this;
+    }
+
+    inline vec3&
+    operator-=(const vec3& l)
+    {
+        for (int i = 0; i < 3; i++) v[i] -= l[i];
+        return *this;
+    }
+
+    inline vec3&
+    operator+=(const vec3& l)
+    {
+        for (int i = 0; i < 3; i++) v[i] += l[i];
         return *this;
     }
 
@@ -113,13 +128,13 @@ struct vec3 {
 inline bool
 operator==(const vec3& r, const vec3& l)
 {
-  return r[0] == l[0] && r[1] == l[1] && r[2] == l[2];
+    return r[0] == l[0] && r[1] == l[1] && r[2] == l[2];
 }
 
 inline bool
 operator!=(const vec3& r, const vec3& l)
 {
-  return !(r == l);
+    return !(r == l);
 }
 
 inline vec3

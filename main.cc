@@ -64,7 +64,7 @@ flood_fill_rast(std::vector<Voxel>& grid, const array<i32, 3>& grid_size, u32& v
                 }
             }
 
-            if (last.type == Voxel::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
+            // if (last.type == Voxel::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
         }
     }
 }
@@ -115,6 +115,26 @@ grid_cut(std::vector<Voxel>& grid,
     }
 }
 
+static real*
+get_polygon_normal(real normal[3], int nverts, const real verts[/* nverts */][3])
+{
+    int i;
+    real tothis[3], toprev[3], cross[3];
+
+    /*
+     * Triangulate the polygon and sum up the nverts-2 triangle normals.
+     */
+    ZEROVEC3(normal);
+    VMV3(toprev, verts[1], verts[0]);     /* 3 subtracts */
+    for (i = 2; i <= nverts - 1; ++i) {   /* n-2 times... */
+        VMV3(tothis, verts[i], verts[0]); /* 3 subtracts */
+        VXV3(cross, toprev, tothis);      /* 3 subtracts, 6 multiplies */
+        VPV3(normal, normal, cross);      /* 3 adds */
+        SET3(toprev, tothis);
+    }
+    return normal;
+}
+
 vec3 scene_aabb_min;
 vec3 scene_aabb_max;
 std::vector<Triangle> triangles;
@@ -156,7 +176,9 @@ main(int argc, char* argv[])
                        std::numeric_limits<f32>::max() };
     scene_aabb_max = { -std::numeric_limits<f32>::max(), -std::numeric_limits<f32>::max(),
                        -std::numeric_limits<f32>::max() };
+    bool flipp_normals = false;
     if (strstr(filename, ".itd")) {
+        flipp_normals = true;
         if (!CGSkelProcessIritDataFiles((const char*)filename)) {
             printf("Input Error: export\n");
             return 1;
@@ -194,6 +216,8 @@ main(int argc, char* argv[])
 
     // FIXME: slow!
     for (auto& t : triangles) {
+        // if (flipp_normals) std::swap(t[1], t[2]);
+
         for (auto& v : t) {
             v = swizzle(v, 2);
             for (i32 i = 0; i < 3; i++)
@@ -230,7 +254,8 @@ main(int argc, char* argv[])
                     if (triangle_aabb_collision(t, aabb)) {
                         auto& voxel = grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z);
                         // assert(
-                        // (max_intersection >= 0.0f && max_intersection <= grid_size[2] - 1.0f));
+                        // (max_intersection >= 0.0f && max_intersection <= grid_size[2]
+                        // - 1.0f));
 
                         if (!voxel.valid) {
                             voxel.valid = true;
@@ -241,14 +266,21 @@ main(int argc, char* argv[])
                         }
 
                         if (flood_fill == FType::RAST) {
-                            const bool bad_point = aabb[0].x == 24 && aabb[0].y == 44 && aabb[0].z == 28;
+                            const bool bad_point =
+                                aabb[0].x == 10 && aabb[0].y == 10 && aabb[0].z == 127;
+                            // if (bad_point) std::raise(SIGINT);
                             auto intersections = find_triangle_aabb_collision(t, aabb);
-                            if (intersections.empty()) continue;
+                            if (intersections.empty()) {
+                                // assert(0 && "Error: no intersection points detected");
+                                continue;
+                            }
 
                             if (bad_point) {
-                                for (auto& v : intersections) {
+                                printf("triangle: ");
+                                for (auto& v : t) printf(" %s", v.to_string().c_str());
+                                printf("\n");
+                                for (auto& v : intersections)
                                     printf("inter point: %s\n", v.to_string().c_str());
-                                }
                             }
                             auto max_intersection =
                                 *std::max_element(intersections.cbegin(), intersections.cend(),
@@ -262,7 +294,6 @@ main(int argc, char* argv[])
                                 type = Voxel::OPENING;
                             else if (triangle_normal.z > 0.0f)
                                 type = Voxel::CLOSING;
-                            // enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
 
                             if (bad_point) {
                                 const char* type_str = (type == Voxel::OPENING) ? "openning" : "closing";
@@ -289,7 +320,8 @@ main(int argc, char* argv[])
         }
     }
 
-    // mesh_center = { mesh_center[0] / voxels_n, mesh_center[1] / voxels_n, mesh_center[2] / voxels_n };
+    // mesh_center = { mesh_center[0] / voxels_n, mesh_center[1] / voxels_n, mesh_center[2] /
+    // voxels_n };
 
     switch (flood_fill) {
     case FType::RAST: flood_fill_rast(grid, grid_size, voxels_n); break;
