@@ -64,7 +64,7 @@ flood_fill_rast(std::vector<Voxel>& grid, const array<i32, 3>& grid_size, u32& v
                 }
             }
 
-            // if (last.type == Voxel::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
+            if (last.type == Voxel::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
         }
     }
 }
@@ -115,26 +115,6 @@ grid_cut(std::vector<Voxel>& grid,
     }
 }
 
-static real*
-get_polygon_normal(real normal[3], int nverts, const real verts[/* nverts */][3])
-{
-    int i;
-    real tothis[3], toprev[3], cross[3];
-
-    /*
-     * Triangulate the polygon and sum up the nverts-2 triangle normals.
-     */
-    ZEROVEC3(normal);
-    VMV3(toprev, verts[1], verts[0]);     /* 3 subtracts */
-    for (i = 2; i <= nverts - 1; ++i) {   /* n-2 times... */
-        VMV3(tothis, verts[i], verts[0]); /* 3 subtracts */
-        VXV3(cross, toprev, tothis);      /* 3 subtracts, 6 multiplies */
-        VPV3(normal, normal, cross);      /* 3 adds */
-        SET3(toprev, tothis);
-    }
-    return normal;
-}
-
 vec3 scene_aabb_min;
 vec3 scene_aabb_max;
 std::vector<Triangle> triangles;
@@ -178,7 +158,7 @@ main(int argc, char* argv[])
                        -std::numeric_limits<f32>::max() };
     bool flipp_normals = false;
     if (strstr(filename, ".itd")) {
-        flipp_normals = true;
+        // flipp_normals = true;
         if (!CGSkelProcessIritDataFiles((const char*)filename)) {
             printf("Input Error: export\n");
             return 1;
@@ -216,8 +196,7 @@ main(int argc, char* argv[])
 
     // FIXME: slow!
     for (auto& t : triangles) {
-        // if (flipp_normals) std::swap(t[1], t[2]);
-
+        if (flipp_normals) std::swap(t[1], t[2]);
         for (auto& v : t) {
             v = swizzle(v, 2);
             for (i32 i = 0; i < 3; i++)
@@ -245,6 +224,12 @@ main(int argc, char* argv[])
             static_cast<i32>(std::floor(tmax.z)),
         };
 
+        // printf("triangle: ");
+        // for (auto& v : t) printf("%s\t", v.to_string().c_str());
+        // printf("\n");
+        // printf("aabb[0]: (%d %d %d)\n", aligned_min[0], aligned_min[1], aligned_min[2]);
+        // printf("aabb[1]: (%d %d %d)\n", aligned_max[0], aligned_max[1], aligned_max[2]);
+
         for (i32 x = aligned_min[0]; x <= aligned_max[0]; x++) {
             for (i32 y = aligned_min[1]; y <= aligned_max[1]; y++) {
                 for (i32 z = aligned_min[2]; z <= aligned_max[2]; z++) {
@@ -266,8 +251,7 @@ main(int argc, char* argv[])
                         }
 
                         if (flood_fill == FType::RAST) {
-                            const bool bad_point =
-                                aabb[0].x == 10 && aabb[0].y == 10 && aabb[0].z == 127;
+                            const bool bad_point = false;
                             // if (bad_point) std::raise(SIGINT);
                             auto intersections = find_triangle_aabb_collision(t, aabb);
                             if (intersections.empty()) {
@@ -296,7 +280,10 @@ main(int argc, char* argv[])
                                 type = Voxel::CLOSING;
 
                             if (bad_point) {
-                                const char* type_str = (type == Voxel::OPENING) ? "openning" : "closing";
+                                const char* type_str =
+                                    (type == Voxel::OPENING)
+                                        ? "openning"
+                                        : (type == Voxel::OPENING) ? "closing" : "both";
                                 printf("max point: %s, type: %s, delta: %f, %s\n",
                                        max_intersection.to_string().c_str(), type_str,
                                        max_intersection.z + epsilon - voxel.max_intersection_off,
@@ -305,8 +292,7 @@ main(int argc, char* argv[])
                                            : "bigger than before");
                             }
                             if (max_intersection.z + epsilon < voxel.max_intersection_off) continue;
-
-                            if (!voxel.valid || max_intersection.z > voxel.max_intersection_off) {
+                            if (voxel.max_type == Voxel::NONE || max_intersection.z > voxel.max_intersection_off) {
                                 voxel.max_type = type;
                                 voxel.max_intersection_off = max_intersection.z;
                             } else if (type == Voxel::CLOSING) { // epsilon included

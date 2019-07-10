@@ -305,12 +305,12 @@ export_magicavoxel(const std::string& filename,
                                 u8 color;
                                 switch (grid.at(at).max_type) {
                                 // case Voxel::OPENING: color = 121; break;
-                                case Voxel::OPENING: color = 1; break;
+                                case Voxel::OPENING: color = 121; break;
                                 // case Voxel::CLOSING: color = 28; break;
                                 // case Voxel::NONE: color = 28; break;
-                                case Voxel::CLOSING: color = 112; break;
-                                case Voxel::NONE: color = 28; break;
-                                case Voxel::BOTH: color = 248; break;
+                                case Voxel::CLOSING: color = 28; break;
+                                case Voxel::NONE: color = 1; break;
+                                case Voxel::BOTH: color = 112; break;
                                 default: assert(0);
                                 }
                                 u32 position_color = ((x * scaling[0] + i) << 24) +
