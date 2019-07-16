@@ -162,7 +162,7 @@ load_obj_file(const std::string& filename)
             { std::move(vertices), std::move(indices), vertex_properties_n == 3 ? true : false });
 
     vec3 aabb_range = aabb_max - aabb_min;
-    f32 aabb_max_size = std::max({ aabb_range.x, aabb_range.y, aabb_range.z });
+    f64 aabb_max_size = std::max({ aabb_range.x, aabb_range.y, aabb_range.z });
     for (auto& m : meshes) {
         for (auto& v : m.vertices) {
             assert(0);
@@ -171,7 +171,7 @@ load_obj_file(const std::string& filename)
         }
     }
 
-    return std::move(meshes);
+    return meshes;
 }
 
 Mesh

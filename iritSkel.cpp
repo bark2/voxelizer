@@ -1,6 +1,11 @@
 // #include "stdafx.h"
 #include "iritSkel.h"
 #include "types.h"
+
+extern vec3 scene_aabb_min;
+extern vec3 scene_aabb_max;
+extern std::vector<Triangle> triangles;
+
 /*****************************************************************************
  * Skeleton for an interface to a parser to read IRIT data files.			 *
  ******************************************************************************
@@ -138,7 +143,6 @@ CGSkelStoreData(IPObjectStruct* PObj)
     if ((Str = CGSkelGetObjectPTexture(PObj)) != NULL) { /* parametric texture code */
     }
     if (Attrs != NULL) {
-        printf("[OBJECT\n");
         while (Attrs) {
             /* attributes code */
             Attrs = AttrTraceAttributes(Attrs, NULL);
@@ -167,7 +171,7 @@ CGSkelStoreData(IPObjectStruct* PObj)
         PVertex = PPolygon->PVertex;
         do {
             for (int j = 0; j < 3; j++) {
-                f32 x = static_cast<f32>(PVertex->Coord[j]);
+                f64 x = PVertex->Coord[j];
                 scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
                 scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
                 if (vi < 3)

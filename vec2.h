@@ -4,26 +4,29 @@
 #include <iostream>
 #include <stdlib.h>
 
-using f32 = float;
+using f64 = double;
 
 struct vec2 {
     union {
-        f32 v[2];
+        f64 v[2];
         struct {
-            f32 x, y;
+            f64 x, y;
         };
     };
 
     typedef std::size_t size_type;
 
-    vec2() {};
-    vec2(f32 x, f32 y)
+    vec2() = default;
+
+    vec2(f64 x, f64 y)
     {
         v[0] = x;
         v[1] = y;
     }
 
-    typedef f32* iterator_type;
+    vec2(f64 a) = delete;
+
+    typedef f64* iterator_type;
 
     iterator_type
     begin()
@@ -53,22 +56,22 @@ struct vec2 {
     {
         return vec2(-v[0], -v[1]);
     }
-    inline f32 operator[](int i) const { return v[i]; }
-    inline f32& operator[](int i) { return v[i]; }
+    inline f64 operator[](int i) const { return v[i]; }
+    inline f64& operator[](int i) { return v[i]; }
 
     inline vec2& operator+=(const vec2& v2);
     inline vec2& operator-=(const vec2& v2);
     inline vec2& operator*=(const vec2& v2);
     inline vec2& operator/=(const vec2& v2);
-    inline vec2& operator*=(const f32 t);
-    inline vec2& operator/=(const f32 t);
+    inline vec2& operator*=(const f64 t);
+    inline vec2& operator/=(const f64 t);
 
-    inline f32
+    inline f64
     length() const
     {
         return sqrt(v[0] * v[0] + v[1] * v[1]);
     }
-    inline f32
+    inline f64
     squared_length() const
     {
         return v[0] * v[0] + v[1] * v[1];
@@ -90,7 +93,7 @@ operator==(const vec2& v1, const vec2& v2)
 }
 
 inline vec2
-operator+(const vec2& v1, f32 a)
+operator+(const vec2& v1, f64 a)
 {
     return vec2(v1.v[0] + a, v1.v[1] + a);
 }
@@ -119,12 +122,12 @@ operator/(const vec2& v1, const vec2& v2)
 }
 
 inline vec2
-operator/(const vec2& v, const f32 a)
+operator/(const vec2& v, const f64 a)
 {
     return vec2(v[0] / a, v[1] / a);
 }
 
-inline f32
+inline f64
 dot(const vec2& v1, const vec2& v2)
 {
     return v1.x * v2.x + v1.y * v2.y;
@@ -136,4 +139,4 @@ unit_vector(vec2 v)
     return v / v.length();
 }
 
-inline vec2 operator*(const f32 a, const vec2& v) { return vec2(a * v.v[0], a * v.v[1]); }
+inline vec2 operator*(const f64 a, const vec2& v) { return vec2(a * v.v[0], a * v.v[1]); }

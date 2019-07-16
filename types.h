@@ -25,7 +25,7 @@ struct Vertex {
 };
 
 using Triangle = array<vec3, 3>;
-vec3 normal(const Triangle& t);
+// if flood-fill, then store the non-normalized directions of the edges and the orig
 
 struct Mesh {
     std::vector<Vertex> vertices;
@@ -37,5 +37,5 @@ struct Mesh {
 struct Voxel {
     bool valid;
     enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
-    f32 max_intersection_off;
+    f64 max_intersection_off;
 };

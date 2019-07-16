@@ -7,18 +7,18 @@
 #include <iostream>
 #include <stdlib.h>
 
-using f32 = float;
+using f64 = double;
 
 struct vec3 {
     union {
-        f32 v[3];
+        f64 v[3];
         struct {
-            f32 x, y, z;
+            f64 x, y, z;
         };
     };
 
     typedef std::size_t size_type;
-    typedef f32* iterator_type;
+    typedef f64* iterator_type;
 
     iterator_type
     begin()
@@ -32,20 +32,15 @@ struct vec3 {
         return v + size();
     }
 
-    vec3() {};
-    vec3(f32 v0, f32 v1, f32 v2)
+    vec3() = default;
+    vec3(f64 v0, f64 v1, f64 v2)
     {
         v[0] = v0;
         v[1] = v1;
         v[2] = v2;
     }
 
-    vec3(f32 a)
-    {
-        v[0] = a;
-        v[1] = a;
-        v[2] = a;
-    }
+    vec3(f64 a) = delete;
 
     inline operator vec2() const { return { x, y }; };
     inline size_type
@@ -64,27 +59,32 @@ struct vec3 {
     {
         return vec3(-v[0], -v[1], -v[2]);
     }
-    inline f32 operator[](int i) const { return v[i]; }
-    inline f32& operator[](int i) { return v[i]; }
-
-    inline vec3& operator*=(const f32 t);
+    inline f64 operator[](int i) const { return v[i]; }
+    inline f64& operator[](int i) { return v[i]; }
 
     inline vec3&
-    operator+=(f32 t)
+    operator*=(const f64 t)
+    {
+        for (auto& i : v) i *= t;
+        return *this;
+    }
+
+    inline vec3&
+    operator+=(f64 t)
     {
         for (auto& i : v) i += t;
         return *this;
     }
 
     inline vec3&
-    operator-=(f32 t)
+    operator-=(f64 t)
     {
         for (auto& i : v) i -= t;
         return *this;
     }
 
     inline vec3&
-    operator/=(f32 t)
+    operator/=(f64 t)
     {
         assert(t != 0.0f);
         for (auto& i : v) i /= t;
@@ -105,12 +105,12 @@ struct vec3 {
         return *this;
     }
 
-    inline f32
+    inline f64
     length() const
     {
         return sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
     }
-    inline f32
+    inline f64
     squared_length() const
     {
         return v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
@@ -138,23 +138,29 @@ operator!=(const vec3& r, const vec3& l)
 }
 
 inline vec3
-operator+(const vec3& v1, f32 a)
+operator+(const vec3& v1, f64 a)
 {
     return vec3(v1.v[0] + a, v1.v[1] + a, v1.v[2] + a);
 }
 
 inline vec3
-operator-(const vec3& v1, f32 a)
+operator-(const vec3& v1, f64 a)
 {
     return vec3(v1.v[0] - a, v1.v[1] - a, v1.v[2] - a);
 }
 
-inline vec3 operator*(const vec3& v1, f32 a) { return vec3(v1.v[0] * a, v1.v[1] * a, v1.v[2] * a); }
+inline vec3 operator*(const vec3& v1, f64 a) { return vec3(v1.v[0] * a, v1.v[1] * a, v1.v[2] * a); }
 
 inline vec3
-operator/(const vec3& v1, f32 a)
+operator/(const vec3& v1, f64 a)
 {
     return vec3(v1.v[0] / a, v1.v[1] / a, v1.v[2] / a);
+}
+
+inline vec3
+operator/(f64 a, const vec3& v1)
+{
+    return vec3(a / v1.v[0], a / v1.v[1], a / v1.v[2]);
 }
 
 inline vec3
@@ -181,7 +187,7 @@ operator/(const vec3& v1, const vec3& v2)
     return vec3(v1.v[0] / v2.v[0], v1.v[1] / v2.v[1], v1.v[2] / v2.v[2]);
 }
 
-inline f32
+inline f64
 dot(const vec3& v1, const vec3& v2)
 {
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
@@ -194,9 +200,9 @@ cross(const vec3& v1, const vec3& v2)
 }
 
 inline vec3
-unit_vector(vec3 v)
+unit(vec3 v)
 {
     return v / v.length();
 }
 
-inline vec3 operator*(const f32 a, const vec3& v) { return vec3(a * v.v[0], a * v.v[1], a * v.v[2]); }
+inline vec3 operator*(const f64 a, const vec3& v) { return vec3(a * v.v[0], a * v.v[1], a * v.v[2]); }
