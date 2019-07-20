@@ -11,14 +11,6 @@
 #include <tuple>
 #include <utility>
 
-bool _gdb = false;
-
-array<vec2, 3>
-to_vec2_array(const array<vec3, 3>& a)
-{
-    return { a[0], a[1], a[2] };
-}
-
 i32 at(array<i32, 3> grid_size, i32 x, i32 y, i32 z)
 {
     return x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
@@ -44,7 +36,7 @@ flood_fill_rec(
 }
 
 void
-flood_fill_rast(std::vector<Voxel>& grid, const array<i32, 3>& grid_size, u32& voxels_n)
+flood_fill_rast(Array& grid, const array<i32, 3>& grid_size, u32& voxels_n)
 {
     struct {
         Voxel::Type type;
@@ -55,11 +47,12 @@ flood_fill_rast(std::vector<Voxel>& grid, const array<i32, 3>& grid_size, u32& v
         for (i32 y = 0; y < grid_size[1]; y++) {
             last = { Voxel::CLOSING, std::numeric_limits<i32>::max() };
             for (i32 z = 0; z < grid_size[2]; z++) {
-                auto& voxel = grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z);
-                if (voxel.valid) { // NONE || BOTH || CLOSING
-                    last = { voxel.max_type, z };
+                Voxel* voxel =
+                    static_cast<Voxel*>(grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z));
+                if (voxel->valid) { // NONE || BOTH || CLOSING
+                    last = { voxel->max_type, z };
                 } else if (last.type == Voxel::OPENING && z > last.z) {
-                    voxel.valid = true;
+                    voxel->valid = true;
                     voxels_n++;
                 }
             }
@@ -67,33 +60,6 @@ flood_fill_rast(std::vector<Voxel>& grid, const array<i32, 3>& grid_size, u32& v
             if (last.type == Voxel::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
         }
     }
-}
-
-void
-flood_fill_inv(std::vector<Voxel>& grid, const array<i32, 3>& grid_size, u32& voxels_n)
-{
-    enum RType { NO_VOX_CLM, VOX_CLM };
-    auto fill_dr = [&](i32 d1, i32 d2, i32 d3, bool dr) {
-        for (i32 x = 0; x < grid_size[d1]; x++) {
-            for (i32 y = 0; y < grid_size[d2]; y++) {
-                for (i32 z = dr ? 0 : grid_size[d3] - 1; z >= 0 && z < grid_size[d3]; z += dr ? 1 : -1) {
-                    if (!grid[at(grid_size, x, y, z)].valid) {
-                        grid[at(grid_size, x, y, z)].valid = true;
-                        voxels_n++;
-                    } else if (z == grid_size[d3] - 1)
-                        return NO_VOX_CLM;
-                    else
-                        return VOX_CLM;
-                }
-            }
-        }
-        return NO_VOX_CLM;
-    };
-    if (fill_dr(0, 1, 2, true) == VOX_CLM) fill_dr(0, 1, 2, false);
-    if (fill_dr(2, 0, 1, true) == VOX_CLM) fill_dr(2, 0, 1, false);
-    if (fill_dr(1, 2, 0, true) == VOX_CLM) fill_dr(1, 2, 0, false);
-
-    voxels_n = grid_size[0] * grid_size[1] * grid_size[2] - voxels_n;
 }
 
 void
@@ -115,6 +81,13 @@ grid_cut(std::vector<Voxel>& grid,
     }
 }
 
+void
+print_usage()
+{
+    printf(
+        "Usage: vox --in file --grid z,x,y [--flood-fill] [--flip-normals] [--magicavoxel --include-normals]\n");
+}
+
 vec3 scene_aabb_min;
 vec3 scene_aabb_max;
 std::vector<Triangle> triangles;
@@ -126,40 +99,56 @@ main(int argc, char* argv[])
 
     char filename[128] = {};
     char** arg_input_file = get_cmd(argv, argv + argc, "--in");
-    if (arg_input_file) sscanf(arg_input_file[1], "%s", filename);
+    if (!arg_input_file) {
+        printf("Input Error: must specify input file\n");
+        print_usage();
+        return 1;
+    }
+    sscanf(arg_input_file[1], "%s", filename);
+#ifndef AI_VERSION_H_INC_
+    if (strstr(filename, ".obj") && strstr(filename, ".itd")) {
+        printf("Input Error: file extention isnt supported\n");
+        return 1;
+    }
+#endif
     assert(strlen(filename) < IRIT_LINE_LEN_VLONG - 5);
 
     array<i32, 3> grid_size;
-    char** arg_resolution = get_cmd(argv, argv + argc, "--resolution");
-    if (arg_resolution)
-        sscanf(arg_resolution[1], "%u,%u,%u", &grid_size[2], &grid_size[0], &grid_size[1]);
-    else
-        assert(0 && "wrong grid resolution input");
-
-    bool voxel_types = false;
-    if (get_cmd(argv, argv + argc, "--types")) voxel_types = true;
-
-    bool flood_fill = false;
-    if (get_cmd(argv, argv + argc, "--flood-fill")) {
-        flood_fill = true;
-        voxel_types = true;
-    }
-
-    bool flip_normals = false;
-    if (get_cmd(argv, argv + argc, "--flip-normals")) flip_normals = true;
-
-    enum class FORMAT { NONE, RAW, MAGICAVOXEL } do_export = FORMAT::NONE;
-    char** arg_format = get_cmd(argv, argv + argc, "--export");
-    if (arg_format && !strcmp(arg_format[1], "raw")) {
-        do_export = FORMAT::RAW;
-    } else if (arg_format && !strcmp(arg_format[1], "magicavoxel")) {
-        do_export = FORMAT::MAGICAVOXEL;
-    } else if (arg_format) {
-        printf("Input Error: export\n");
+    char** arg_resolution = get_cmd(argv, argv + argc, "--grid");
+    if (!arg_resolution) {
+        printf("Input Error: wrong grid format");
+        print_usage();
         return 1;
     }
+    sscanf(arg_resolution[1], "%u,%u,%u", &grid_size[2], &grid_size[0], &grid_size[1]);
 
-    std::vector<Voxel> grid(grid_size[0] * grid_size[1] * grid_size[2], { false, Voxel::NONE, 0.0f });
+    bool do_include_normals = false;
+    if (get_cmd(argv, argv + argc, "--include-normals")) do_include_normals = true;
+
+    bool do_flood_fill = false;
+    if (get_cmd(argv, argv + argc, "--flood-fill")) {
+        do_flood_fill = true;
+        do_include_normals = true;
+    }
+
+    bool do_flip_normals = false;
+    if (get_cmd(argv, argv + argc, "--flip-normals")) do_flip_normals = true;
+
+    enum class FORMAT { RAW, MAGICAVOXEL } do_export = FORMAT::RAW;
+    char** arg_format = get_cmd(argv, argv + argc, "--magicavoxel");
+    if (arg_format) do_export = FORMAT::MAGICAVOXEL;
+
+    Array grid;
+    if (!do_include_normals)
+        grid.buff = static_cast<u8*>(calloc(grid_size[0] * grid_size[1] * grid_size[2] / 8, 1));
+    else {
+        grid.buff = static_cast<u8*>(calloc(grid_size[0] * grid_size[1] * grid_size[2], sizeof(Voxel)));
+        grid.elem_bits = sizeof(Voxel) * 8;
+    }
+    if (!grid.buff) {
+        perror("Error calloc");
+        return 1;
+    }
 
     scene_aabb_min = { std::numeric_limits<f64>::max(), std::numeric_limits<f64>::max(),
                        std::numeric_limits<f64>::max() };
@@ -167,11 +156,11 @@ main(int argc, char* argv[])
                        -std::numeric_limits<f64>::max() };
     if (strstr(filename, ".itd")) {
         if (!CGSkelProcessIritDataFiles((const char*)filename)) {
-            printf("Input Error: export\n");
+            printf("Error: irit parser\n");
             return 1;
         }
     } else {
-        const auto meshes = ai_load_obj_file(filename);
+        const auto meshes = load_file(filename);
         std::size_t triangles_num = 0;
         for (auto& mesh : meshes) triangles_num += mesh.vertices.size() / 3;
         triangles.reserve(triangles_num);
@@ -197,18 +186,14 @@ main(int argc, char* argv[])
     scene_aabb_min = swizzle(scene_aabb_min, 2);
     f64 scene_aabb_min_min = std::min({ scene_aabb_min[0], scene_aabb_min[1], scene_aabb_min[2] });
     f64 scene_aabb_max_max = std::max({ scene_aabb_max[0], scene_aabb_max[1], scene_aabb_max[2] });
-    // vec3 voxel_size = { (scene_aabb_max[0] - scene_aabb_min[0]) / grid_size[0],
-    // (scene_aabb_max[1] - scene_aabb_min[1]) / grid_size[1],
-    // (scene_aabb_max[2] - scene_aabb_min[2]) / grid_size[2] };
-    vec3 voxel_size = { 1.0f, 1.0f, 1.0f }; // TODO multiple by res / max_resolution foreach
 
-    // FIXME: slow!
     for (auto& t : triangles) {
-        if (flip_normals) std::swap(t[1], t[2]);
+        if (do_flip_normals) std::swap(t[1], t[2]);
         for (auto& v : t) {
             v = swizzle(v, 2);
+            // saves the headache of finding the grid voxel for each point
             for (i32 i = 0; i < 3; i++) {
-                // normalize to [0.0f, grid_size - 1.0f]
+                // normalize to[0.0f, grid_size - 1.0f]
                 v[i] = (v[i] - scene_aabb_min[i]) / (scene_aabb_max_max - scene_aabb_min_min);
                 v[i] *= grid_size[i] - 1.0f;
             }
@@ -218,67 +203,66 @@ main(int argc, char* argv[])
     u32 voxels_n = 0;
     array<u32, 3> mesh_center {};
     for (auto& t : triangles) {
-        vec3 triangle_normal = unit(cross(t[1] - t[0], t[2] - t[0]));
-        array<bool, 3> back_facing;
-        for (int i = 0; i < 3; i++) back_facing[i] = triangle_normal[i] > 0;
-
         vec3 tmin, tmax;
         triangle_aabb(t, &tmin, &tmax);
-        array<i32, 3> aligned_min = { static_cast<i32>(progressive_floor(tmin.x)),
-                                      static_cast<i32>(progressive_floor(tmin.y)),
-                                      static_cast<i32>(progressive_floor(tmin.z)) };
+        array<i32, 3> aligned_min, aligned_max;
+        for (int i = 0; i < 3; i++) {
+            aligned_min[i] = static_cast<i32>(progressive_floor(tmin[i]));
+            aligned_max[i] = static_cast<i32>(std::floor(tmax[i]));
+        }
 
-        array<i32, 3> aligned_max = {
-            static_cast<i32>(std::floor(tmax.x)),
-            static_cast<i32>(std::floor(tmax.y)),
-            static_cast<i32>(std::floor(tmax.z)),
-        };
+        vec3 tri_normal = cross(t[1] - t[0], t[2] - t[0]);
+        vec3 edges[3];
+        for (int i = 0; i < 3; i++) edges[i] = t[(i + 1) % 3] - t[i];
 
         for (i32 x = aligned_min[0]; x <= aligned_max[0]; x++) {
             for (i32 y = aligned_min[1]; y <= aligned_max[1]; y++) {
                 for (i32 z = aligned_min[2]; z <= aligned_max[2]; z++) {
                     vec3 min_voxel = vec3(x, y, z);
-                    array<vec3, 2> aabb = { min_voxel, min_voxel + voxel_size };
+                    array<vec3, 2> aabb = { min_voxel, min_voxel + 1.0f };
 
-                    auto is_coll = triangle_aabb_collision(t, aabb);
+                    bool is_coll = triangle_aabb_collision_mt(t, tri_normal, edges, aabb);
                     if (is_coll) {
-                        auto& voxel = grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z);
-                        // assert(
-                        // (max_intersection >= 0.0f && max_intersection <= grid_size[2]
-                        // - 1.0f));
+                        if (!do_include_normals) {
+                            u8* voxels = static_cast<u8*>(
+                                grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z));
+                            u8 bit_number = z % 8;
+                            u8 mask = 1 << bit_number;
+                            if (!(*voxels & mask)) {
+                                *voxels = *voxels | mask;
+                                voxels_n++;
+                            }
+                        } else {
+                            Voxel* voxel = static_cast<Voxel*>(
+                                grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z));
+                            if (!voxel->valid) {
+                                voxel->valid = true;
+                                voxels_n++;
+                            }
 
-                        if (!voxel.valid) {
-                            voxel.valid = true;
-                            voxels_n++;
-                            mesh_center[0] += x;
-                            mesh_center[1] += y;
-                            mesh_center[2] += z;
-                        }
-
-                        if (voxel_types) {
-                            auto colls = find_triangle_aabb_collision(t, aabb);
+                            auto colls = find_triangle_aabb_collision(t, edges, aabb);
                             if (colls.empty()) continue; // the triangle is inside the aabb
 
-                            auto max_intersection = *std::max_element(colls.cbegin(), colls.cend(),
-                                                                      [](const vec3& l, const vec3& r) {
-                                                                          return l.z < r.z;
-                                                                      });
+                            auto max_coll = *std::max_element(colls.cbegin(), colls.cend(),
+                                                              [](const vec3& l, const vec3& r) {
+                                                                  return l.z < r.z;
+                                                              });
+
                             Voxel::Type type;
-                            if (std::abs(triangle_normal.z) < epsilon)
+                            if (std::abs(tri_normal.z) < epsilon)
                                 type = Voxel::BOTH;
-                            else if (triangle_normal.z < 0.0f)
+                            else if (tri_normal.z < 0.0f)
                                 type = Voxel::OPENING;
-                            else if (triangle_normal.z > 0.0f)
+                            else if (tri_normal.z > 0.0f)
                                 type = Voxel::CLOSING;
 
-                            if (max_intersection.z + epsilon < voxel.max_intersection_off) continue;
-                            if (voxel.max_type == Voxel::NONE ||
-                                max_intersection.z > voxel.max_intersection_off) {
-                                voxel.max_type = type;
-                                voxel.max_intersection_off = max_intersection.z;
+                            if (max_coll.z + epsilon < voxel->max_coll_off) continue;
+                            if (voxel->max_type == Voxel::NONE || max_coll.z > voxel->max_coll_off) {
+                                voxel->max_type = type;
+                                voxel->max_coll_off = max_coll.z;
                             } else if (type == Voxel::CLOSING) { // epsilon included
-                                voxel.max_type = type;
-                                voxel.max_intersection_off = max_intersection.z;
+                                voxel->max_type = type;
+                                voxel->max_coll_off = max_coll.z;
                             }
                         }
                     }
@@ -287,16 +271,15 @@ main(int argc, char* argv[])
         }
     }
 
-    if (flood_fill) flood_fill_rast(grid, grid_size, voxels_n);
+    if (do_flood_fill) flood_fill_rast(grid, grid_size, voxels_n);
 
     if (do_export == FORMAT::MAGICAVOXEL) {
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));
         if (export_magicavoxel("bunny.vox", grid, grid_size, voxels_n))
             assert(0 && "couldn't not open the vox file");
         printf("voxels:\t%u\n", voxels_n);
-    } else if (do_export == FORMAT::RAW) {
+    } else
         export_raw(grid, grid_size);
-    }
 
     return 0;
 }

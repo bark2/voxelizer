@@ -14,9 +14,57 @@
 #include <string>
 #include <vector>
 
-#include <assimp/Importer.hpp>
+#ifdef AI_VERSION_H_INC_
+
+#include <assimp/I mporter.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
+
+Mesh
+processMesh(aiMesh* mesh, const aiScene* scene)
+{
+    std::vector<Vertex> vertices;
+    std::vector<u32> indices;
+
+    for (u32 i = 0; i < mesh->mNumVertices; i++) {
+        Vertex vertex;
+        vertex.pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
+        // vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
+        vertices.push_back(vertex);
+    }
+    for (u32 i = 0; i < mesh->mNumFaces; i++) {
+        aiFace face = mesh->mFaces[i];
+        for (u32 j = 0; j < face.mNumIndices; j++) indices.push_back(face.mIndices[j]);
+    }
+    return { vertices, indices, false };
+}
+
+void
+processNode(aiNode* node, const aiScene* scene, std::vector<Mesh>* meshes)
+{
+    for (u32 i = 0; i < node->mNumMeshes; i++) {
+        aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+        meshes->emplace_back(processMesh(mesh, scene));
+    }
+    for (u32 i = 0; i < node->mNumChildren; i++) { processNode(node->mChildren[i], scene, meshes); }
+}
+
+std::vector<Mesh>
+ai_load_file(const std::string& filename)
+{
+    std::vector<Mesh> meshes;
+    Assimp::Importer importer;
+    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate);
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+        printf("ERROR::ASSIMP::%s", importer.GetErrorString());
+        return {};
+    }
+    processNode(scene->mRootNode, scene, &meshes);
+
+    return meshes;
+}
+
+#endif
 
 static const u32 max_line = 128;
 
@@ -26,8 +74,12 @@ static const std::array<const std::string, COMMANDS_COUNT> commands_map { "v ", 
                                                                           "g ", "o ",  "s ",  "#" };
 
 std::vector<Mesh>
-load_obj_file(const std::string& filename)
+load_file(const std::string& filename)
 {
+#ifdef AI_VERSION_H_INC_
+    return ai_load_obj_file(filename);
+#endif
+
     std::ifstream infile(filename);
     if (!infile.is_open()) {
         std::cout << "Error: load_obj_file\tfile: " << __FILE__ << "\tline:" << __LINE__ << '\n';
@@ -174,50 +226,6 @@ load_obj_file(const std::string& filename)
     return meshes;
 }
 
-Mesh
-processMesh(aiMesh* mesh, const aiScene* scene)
-{
-    std::vector<Vertex> vertices;
-    std::vector<u32> indices;
-
-    for (u32 i = 0; i < mesh->mNumVertices; i++) {
-        Vertex vertex;
-        vertex.pos = { mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z };
-        // vertex.normal = { mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z };
-        vertices.push_back(vertex);
-    }
-    for (u32 i = 0; i < mesh->mNumFaces; i++) {
-        aiFace face = mesh->mFaces[i];
-        for (u32 j = 0; j < face.mNumIndices; j++) indices.push_back(face.mIndices[j]);
-    }
-    return { vertices, indices, false };
-}
-
-void
-processNode(aiNode* node, const aiScene* scene, std::vector<Mesh>* meshes)
-{
-    for (u32 i = 0; i < node->mNumMeshes; i++) {
-        aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        meshes->emplace_back(processMesh(mesh, scene));
-    }
-    for (u32 i = 0; i < node->mNumChildren; i++) { processNode(node->mChildren[i], scene, meshes); }
-}
-
-std::vector<Mesh>
-ai_load_obj_file(const std::string& filename)
-{
-    std::vector<Mesh> meshes;
-    Assimp::Importer importer;
-    const aiScene* scene = importer.ReadFile(filename, aiProcess_Triangulate);
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-        printf("ERROR::ASSIMP::%s", importer.GetErrorString());
-        return {};
-    }
-    processNode(scene->mRootNode, scene, &meshes);
-
-    return meshes;
-}
-
 // 2. Chunk Structure
 // -------------------------------------------------------------------------------
 // # Bytes  | Type       | Value
@@ -256,10 +264,7 @@ to_little(u32 big)
 
 // little indian
 int
-export_magicavoxel(const std::string& filename,
-                   const std::vector<Voxel>& grid,
-                   array<i32, 3> grid_size,
-                   u32 voxels_n)
+export_magicavoxel(const std::string& filename, const Array& grid, array<i32, 3> grid_size, u32 voxels_n)
 {
     FILE* out = fopen(filename.c_str(), "wb");
     if (!out) return 1;
@@ -298,20 +303,20 @@ export_magicavoxel(const std::string& filename,
         for (u8 y = 0; y < grid_size[1]; y++)
             for (u8 z = 0; z < grid_size[2]; z++) {
                 u32 at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
-                if (grid.at(at).valid)
+                if (((Voxel*)grid.at(at))->valid)
                     for (u8 i = 0; i < scaling[0]; i++)
                         for (u8 j = 0; j < scaling[1]; j++)
                             for (u8 k = 0; k < scaling[2]; k++) {
                                 u8 color;
-                                switch (grid.at(at).max_type) {
-                                // case Voxel::OPENING: color = 121; break;
+                                switch (((Voxel*)grid.at(at))->max_type) {
                                 case Voxel::OPENING: color = 121; break;
-                                // case Voxel::CLOSING: color = 28; break;
-                                // case Voxel::NONE: color = 28; break;
                                 case Voxel::CLOSING: color = 28; break;
                                 case Voxel::NONE: color = 1; break;
                                 case Voxel::BOTH: color = 112; break;
-                                default: assert(0);
+                                default: {
+                                    // printf("%d\n", ((Voxel*)grid.at(at))->max_type);
+                                    // assert(0);
+                                }
                                 }
                                 u32 position_color = ((x * scaling[0] + i) << 24) +
                                                      ((y * scaling[1] + j) << 16) +
@@ -326,30 +331,19 @@ export_magicavoxel(const std::string& filename,
 }
 
 int
-export_raw(const std::vector<Voxel>& grid, array<i32, 3> grid_size)
+export_raw(const Array& grid, array<i32, 3> grid_size)
 {
-    // printf("%d %d %d\n", grid_size[0], grid_size[1], grid_size[2]);
-    for (i32 x = 0; x < grid_size[0]; x++)
-        for (i32 y = 0; y < grid_size[1]; y++)
-            for (i32 z = 0; z < grid_size[2]; z++) {
-                u32 at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
-                u8 color;
-                if (!grid.at(at).valid) {
-                    putchar('0');
-                } else {
-                    putchar('1');
-                    switch (grid.at(at).max_type) {
-                    case Voxel::OPENING: color = 121; break;
-                    case Voxel::CLOSING: color = 15; break;
-                    case Voxel::NONE: {
-                        color = 1;
-                        // printf("NONE: %d %d %d\n", x, y, z);
-                    } break; // gray
-                    case Voxel::BOTH: color = 248; break;
-                    default: assert(0);
-                    }
-                    putchar(color);
-                }
+    for (i32 z = 0; z < grid_size[0]; z++)
+        for (i32 x = 0; x < grid_size[1]; x++)
+            for (i32 y = 0; y < grid_size[2]; y++) {
+                u32 at = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
+                const u8* voxels = static_cast<const u8*>(grid.at(at));
+                u8 bit_number = y % 8;
+                u8 mask = 1 << bit_number;
+                if (!(*voxels & mask))
+                    puts("1");
+                else
+                    puts("0");
             }
     return 0;
 }

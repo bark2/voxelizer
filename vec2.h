@@ -17,14 +17,8 @@ struct vec2 {
     typedef std::size_t size_type;
 
     vec2() = default;
-
-    vec2(f64 x, f64 y)
-    {
-        v[0] = x;
-        v[1] = y;
-    }
-
-    vec2(f64 a) = delete;
+    constexpr vec2(f64 v0, f64 v1) : x(v0), y(v1) {};
+    constexpr explicit vec2(f64 a) : x(a), y(a) {};
 
     typedef f64* iterator_type;
 

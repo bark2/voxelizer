@@ -33,14 +33,8 @@ struct vec3 {
     }
 
     vec3() = default;
-    vec3(f64 v0, f64 v1, f64 v2)
-    {
-        v[0] = v0;
-        v[1] = v1;
-        v[2] = v2;
-    }
-
-    vec3(f64 a) = delete;
+    constexpr vec3(f64 v0, f64 v1, f64 v2) : x(v0), y(v1), z(v2) {};
+    constexpr explicit vec3(f64 a) : x(a), y(a), z(a) {};
 
     inline operator vec2() const { return { x, y }; };
     inline size_type
