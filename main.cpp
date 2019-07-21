@@ -218,14 +218,14 @@ main(int argc, char* argv[])
         for (i32 x = aligned_min[0]; x <= aligned_max[0]; x++) {
             for (i32 y = aligned_min[1]; y <= aligned_max[1]; y++) {
                 for (i32 z = aligned_min[2]; z <= aligned_max[2]; z++) {
+                    auto at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
                     vec3 min_voxel = vec3(x, y, z);
                     array<vec3, 2> aabb = { min_voxel, min_voxel + 1.0f };
 
                     bool is_coll = triangle_aabb_collision_mt(t, tri_normal, edges, aabb);
                     if (is_coll) {
                         if (!do_include_normals) {
-                            u8* voxels = static_cast<u8*>(
-                                grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z));
+                            u8* voxels = static_cast<u8*>(grid.at(at));
                             u8 bit_number = z % 8;
                             u8 mask = 1 << bit_number;
                             if (!(*voxels & mask)) {
@@ -233,8 +233,7 @@ main(int argc, char* argv[])
                                 voxels_n++;
                             }
                         } else {
-                            Voxel* voxel = static_cast<Voxel*>(
-                                grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z));
+                            Voxel* voxel = static_cast<Voxel*>(grid.at(at));
                             if (!voxel->valid) {
                                 voxel->valid = true;
                                 voxels_n++;
@@ -279,7 +278,7 @@ main(int argc, char* argv[])
             assert(0 && "couldn't not open the vox file");
         printf("voxels:\t%u\n", voxels_n);
     } else
-        export_raw(grid, grid_size);
+        export_raw(grid, grid_size, do_include_normals);
 
     return 0;
 }

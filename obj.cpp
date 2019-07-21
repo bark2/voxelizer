@@ -343,16 +343,24 @@ export_magicavoxel(const std::string& filename,
 }
 
 int
-export_raw(const Array& grid, array<i32, 3> grid_size)
+export_raw(const Array& grid, array<i32, 3> grid_size, bool is_normal_included)
 {
     for (i32 z = 0; z < grid_size[0]; z++)
         for (i32 x = 0; x < grid_size[1]; x++)
             for (i32 y = 0; y < grid_size[2]; y++) {
                 u32 at = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
-                const u8* voxels = static_cast<const u8*>(grid.at(at));
-                u8 bit_number = y % 8;
-                u8 mask = 1 << bit_number;
-                if (!(*voxels & mask))
+
+                bool is_valid;
+                if (is_normal_included) {
+                    is_valid = ((Voxel*)grid.at(at))->valid;
+                } else {
+                    const u8* voxels = static_cast<const u8*>(grid.at(at));
+                    u8 bit_number = y % 8;
+                    u8 mask = 1 << bit_number;
+                    is_valid = *voxels & mask;
+                }
+
+                if (is_valid)
                     puts("1");
                 else
                     puts("0");
