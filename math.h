@@ -439,34 +439,52 @@ get_aabb_vertices(const array<vec3, 2>& aabb, vec3 vertices[])
     vertices[7] = { aabb[1].x, aabb[1].y, aabb[1].z };
 }
 
+// < x: {4, 5, 8, 11}
+// > x: {1, 2, 6, 10}
+// < y: {4, 5, 9, 10}
+// > y: {0, 2, 7, 11}
+// < z: {3, 4, 6, 7}
+// > z: {0, 1, 8, 9}
 inline void
 get_aabb_edges(const array<vec3, 2>& aabb, array<vec3, 2> edges[])
 {
     edges[0] = { aabb[0], { aabb[1].x, aabb[0].y, aabb[0].z } };
-    edges[0] = { aabb[0], { aabb[1].x, aabb[0].y, aabb[0].z } };
     edges[1] = { aabb[0], { aabb[0].x, aabb[1].y, aabb[0].z } };
-    edges[1] = { aabb[0], { aabb[0].x, aabb[1].y, aabb[0].z } };
-    edges[2] = { aabb[0], { aabb[0].x, aabb[0].y, aabb[1].z } };
     edges[2] = { aabb[0], { aabb[0].x, aabb[0].y, aabb[1].z } };
 
     edges[3] = { aabb[1], { aabb[0].x, aabb[1].y, aabb[1].z } };
-    edges[3] = { aabb[1], { aabb[0].x, aabb[1].y, aabb[1].z } };
     edges[4] = { aabb[1], { aabb[1].x, aabb[0].y, aabb[1].z } };
-    edges[4] = { aabb[1], { aabb[1].x, aabb[0].y, aabb[1].z } };
-    edges[5] = { aabb[1], { aabb[1].x, aabb[1].y, aabb[0].z } };
     edges[5] = { aabb[1], { aabb[1].x, aabb[1].y, aabb[0].z } };
 
     edges[6] = { vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[0].x, aabb[1].y, aabb[1].z } };
-    edges[6] = { vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[0].x, aabb[1].y, aabb[1].z } };
-    edges[7] = { vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[1].x, aabb[0].y, aabb[1].z } };
     edges[7] = { vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[1].x, aabb[0].y, aabb[1].z } };
 
-    edges[8] = { vec3 { aabb[1].x, aabb[1].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[0].z } };
     edges[8] = { vec3 { aabb[1].x, aabb[1].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[0].z } };
     edges[9] = { vec3 { aabb[1].x, aabb[1].y, aabb[0].z }, { aabb[0].x, aabb[1].y, aabb[0].z } };
 
     edges[10] = { vec3 { aabb[0].x, aabb[1].y, aabb[0].z }, { aabb[0].x, aabb[1].y, aabb[1].z } };
     edges[11] = { vec3 { aabb[1].x, aabb[0].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[1].z } };
+}
+
+inline constexpr array<array<vec3, 2>, 12>
+get_aabb_edges(const array<vec3, 2>& aabb)
+{
+    return { array<vec3, 2> { aabb[0], { aabb[1].x, aabb[0].y, aabb[0].z } },
+             { aabb[0], { aabb[0].x, aabb[1].y, aabb[0].z } },
+             { aabb[0], { aabb[0].x, aabb[0].y, aabb[1].z } },
+
+             { aabb[1], { aabb[0].x, aabb[1].y, aabb[1].z } },
+             { aabb[1], { aabb[1].x, aabb[0].y, aabb[1].z } },
+             { aabb[1], { aabb[1].x, aabb[1].y, aabb[0].z } },
+
+             { vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[0].x, aabb[1].y, aabb[1].z } },
+             { vec3 { aabb[0].x, aabb[0].y, aabb[1].z }, { aabb[1].x, aabb[0].y, aabb[1].z } },
+
+             { vec3 { aabb[1].x, aabb[1].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[0].z } },
+             { vec3 { aabb[1].x, aabb[1].y, aabb[0].z }, { aabb[0].x, aabb[1].y, aabb[0].z } },
+
+             { vec3 { aabb[0].x, aabb[1].y, aabb[0].z }, { aabb[0].x, aabb[1].y, aabb[1].z } },
+             { vec3 { aabb[1].x, aabb[0].y, aabb[0].z }, { aabb[1].x, aabb[0].y, aabb[1].z } } };
 }
 
 inline vector<vec3>
@@ -475,8 +493,7 @@ find_triangle_aabb_collision(const Triangle& t,
                              const array<vec3, 2>& aabb,
                              bool verbose = false)
 {
-    array<vec3, 2> aabb_edges[12];
-    get_aabb_edges(aabb, &aabb_edges[0]);
+    auto aabb_edges = get_aabb_edges(aabb);
 
     vector<vec3> collisions;
     collisions.reserve(6);

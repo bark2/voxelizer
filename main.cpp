@@ -105,7 +105,7 @@ main(int argc, char* argv[])
         return 1;
     }
     sscanf(arg_input_file[1], "%s", filename);
-#ifndef AI_VERSION_H_INC_
+#ifndef AI
     if (strstr(filename, ".obj") && strstr(filename, ".itd")) {
         printf("Input Error: file extention isnt supported\n");
         return 1;

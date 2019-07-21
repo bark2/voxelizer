@@ -14,9 +14,8 @@
 #include <string>
 #include <vector>
 
-#ifdef AI_VERSION_H_INC_
-
-#include <assimp/I mporter.hpp>
+#ifdef AI
+#include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
 
@@ -76,8 +75,8 @@ static const std::array<const std::string, COMMANDS_COUNT> commands_map { "v ", 
 std::vector<Mesh>
 load_file(const std::string& filename)
 {
-#ifdef AI_VERSION_H_INC_
-    return ai_load_obj_file(filename);
+#ifdef AI
+    return ai_load_file(filename);
 #endif
 
     std::ifstream infile(filename);
