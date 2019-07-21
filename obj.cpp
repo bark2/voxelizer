@@ -263,7 +263,11 @@ to_little(u32 big)
 
 // little indian
 int
-export_magicavoxel(const std::string& filename, const Array& grid, array<i32, 3> grid_size, u32 voxels_n)
+export_magicavoxel(const std::string& filename,
+                   const Array& grid,
+                   array<i32, 3> grid_size,
+                   u32 voxels_n,
+                   bool is_normal_included)
 {
     FILE* out = fopen(filename.c_str(), "wb");
     if (!out) return 1;
@@ -302,20 +306,29 @@ export_magicavoxel(const std::string& filename, const Array& grid, array<i32, 3>
         for (u8 y = 0; y < grid_size[1]; y++)
             for (u8 z = 0; z < grid_size[2]; z++) {
                 u32 at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
-                if (((Voxel*)grid.at(at))->valid)
+                bool is_valid;
+                if (is_normal_included) {
+                    is_valid = ((Voxel*)grid.at(at))->valid;
+                } else {
+                    const u8* voxels = static_cast<const u8*>(
+                        grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z));
+                    u8 bit_number = z % 8;
+                    u8 mask = 1 << bit_number;
+                    is_valid = *voxels & mask;
+                }
+                if (is_valid)
                     for (u8 i = 0; i < scaling[0]; i++)
                         for (u8 j = 0; j < scaling[1]; j++)
                             for (u8 k = 0; k < scaling[2]; k++) {
-                                u8 color;
-                                switch (((Voxel*)grid.at(at))->max_type) {
-                                case Voxel::OPENING: color = 121; break;
-                                case Voxel::CLOSING: color = 28; break;
-                                case Voxel::NONE: color = 1; break;
-                                case Voxel::BOTH: color = 112; break;
-                                default: {
-                                    // printf("%d\n", ((Voxel*)grid.at(at))->max_type);
-                                    // assert(0);
-                                }
+                                u8 color = 1;
+                                if (is_normal_included) {
+                                    switch (((Voxel*)grid.at(at))->max_type) {
+                                    case Voxel::OPENING: color = 121; break;
+                                    case Voxel::CLOSING: color = 28; break;
+                                    case Voxel::NONE: color = 1; break;
+                                    case Voxel::BOTH: color = 112; break;
+                                    default: assert(0);
+                                    }
                                 }
                                 u32 position_color = ((x * scaling[0] + i) << 24) +
                                                      ((y * scaling[1] + j) << 16) +

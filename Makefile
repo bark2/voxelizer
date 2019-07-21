@@ -1,5 +1,5 @@
 # $ intercept-build make
-IRIT_DIR = /home/bar/Programming/Projects/voxelizer/irit/irit-sm
+IRIT_DIR = /home/bar/Programming/Projects/voxelizer/irit-sm
 
 include $(IRIT_DIR)/makeflag.unx
 

@@ -275,7 +275,7 @@ main(int argc, char* argv[])
 
     if (do_export == FORMAT::MAGICAVOXEL) {
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));
-        if (export_magicavoxel("bunny.vox", grid, grid_size, voxels_n))
+        if (export_magicavoxel("bunny.vox", grid, grid_size, voxels_n, do_include_normals))
             assert(0 && "couldn't not open the vox file");
         printf("voxels:\t%u\n", voxels_n);
     } else
