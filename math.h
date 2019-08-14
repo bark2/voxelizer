@@ -328,7 +328,7 @@ line_triangle_intersection_fast(const array<vec3, 2>& line,
 }
 
 inline bool
-has_seperating_plane(const array<vec2, 3>& proj_triangle, bool back_facing, const array<vec2, 2>& square)
+has_seperating_line(const array<vec2, 3>& proj_triangle, bool back_facing, const array<vec2, 2>& square)
 {
     const array<vec2, 4> square_vertices = {
         square[0], square[1], { square[0].x, square[1].y }, { square[1].x, square[0].y }
@@ -341,6 +341,7 @@ has_seperating_plane(const array<vec2, 3>& proj_triangle, bool back_facing, cons
             f64 dist = signed_edge_function(edge, back_facing, v);
             max_signed_dist = std::max(max_signed_dist, dist);
         }
+        // all vertices are on the negetive side of the edge
         if (max_signed_dist < 0.0f) return true;
     }
     return false;
@@ -528,11 +529,12 @@ inline bool
 triangle_aabb_collision(const Triangle& t, const array<vec3, 2>& aabb, bool verbose = false)
 {
     bool result = true;
-    vec3 triangle_normal = swizzle(unit(cross(t[1] - t[0], t[2] - t[0])), 2);
+    vec3 normal = unit(cross(t[1] - t[0], t[2] - t[0]));
+    vec3 facing = swizzle(normal, 2);
     for (int i = 0; result && i < 3; i++) {
         array<vec2, 3> proj_triangle = { swizzle(t[0], i), swizzle(t[1], i), swizzle(t[2], i) };
         array<vec2, 2> proj_aabb = { swizzle(aabb[0], i), swizzle(aabb[1], i) };
-        if (has_seperating_plane(proj_triangle, triangle_normal[i] > 0, proj_aabb)) result = false;
+        if (has_seperating_line(proj_triangle, facing[i] > 0, proj_aabb)) result = false;
     }
 
     if (verbose) {

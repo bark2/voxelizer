@@ -263,13 +263,13 @@ to_little(u32 big)
 
 // little indian
 int
-export_magicavoxel(const std::string& filename,
+export_magicavoxel(const char* filename,
                    const Array& grid,
                    array<i32, 3> grid_size,
                    u32 voxels_n,
                    bool is_normal_included)
 {
-    FILE* out = fopen(filename.c_str(), "wb");
+    FILE* out = fopen(filename, "wb");
     if (!out) return 1;
 
     u32 meta_size = 3 * sizeof(u32);

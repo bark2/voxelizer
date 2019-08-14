@@ -55,11 +55,11 @@ struct Mesh {
     bool has_uvs;
 };
 
-// TODO: split to two types, while the other contains *only* the type
 struct Voxel {
     bool valid;
     enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
     f64 max_coll_off;
+    // FIXME: add left-of / right-of
 };
 
 struct Array {

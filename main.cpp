@@ -113,6 +113,21 @@ main(int argc, char* argv[])
 #endif
     assert(strlen(filename) < IRIT_LINE_LEN_VLONG - 5);
 
+    char out_filename[128] = {};
+    char** arg_output_file = get_cmd(argv, argv + argc, "--out");
+    if (arg_output_file)
+        sscanf(arg_output_file[1], "%s", out_filename);
+    else {
+        char* start = strrchr(filename, '/');
+        start = start ? start + 1 : filename;
+        const char* dot = strrchr(filename, '.');
+        memcpy(out_filename, start, dot - start);
+        strcpy(out_filename + (dot - start), ".vox");
+        printf("%s\n", out_filename);
+    }
+
+    assert(strlen(out_filename) < IRIT_LINE_LEN_VLONG - 5);
+
     array<i32, 3> grid_size;
     char** arg_resolution = get_cmd(argv, argv + argc, "--grid");
     if (!arg_resolution) {
@@ -201,67 +216,183 @@ main(int argc, char* argv[])
     }
 
     u32 voxels_n = 0;
-    array<u32, 3> mesh_center {};
-    for (auto& t : triangles) {
-        vec3 tmin, tmax;
-        triangle_aabb(t, &tmin, &tmax);
-        array<i32, 3> aligned_min, aligned_max;
-        for (int i = 0; i < 3; i++) {
-            aligned_min[i] = static_cast<i32>(progressive_floor(tmin[i]));
-            aligned_max[i] = static_cast<i32>(std::floor(tmax[i]));
+    if (true) {
+        for (auto& tri : triangles) {
+            // printf("\ntri: %s %s %s\n", tri[0].to_string().c_str(), tri[1].to_string().c_str(),
+            // tri[2].to_string().c_str());
+            // printf("e1: %s\ne2: %s\n", (tri[1] - tri[0]).to_string().c_str(),
+            // (tri[2] - tri[0]).to_string().c_str());
+
+            vec3 tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
+            // printf("normal: %s\n", tri_normal.to_string().c_str());
+            const f64* dominant_axis =
+                std::max_element(tri_normal.begin(), tri_normal.end(),
+                                 [](f64 lhs, f64 rhs) { return abs(lhs) < abs(rhs); });
+            i32 dominant_axis_idx = dominant_axis - &tri_normal.x;
+
+            for (auto& v : tri) v = swizzle(v, dominant_axis_idx + 1);
+            tri_normal = swizzle(tri_normal, dominant_axis_idx + 1);
+
+            std::sort(tri.begin(), tri.end(),
+                      [](const vec3& lhs, const vec3& rhs) { return lhs.y < rhs.y; });
+
+            // assume scanline: edge[0] -> edge[1]
+            f64 dx = signed_edge_function(tri[0], tri[2], true, tri[1]) > 0.0f ? -1.0f : 1.0f;
+
+            struct Edge {
+                f64 x;
+                f64 dx;
+            } edges[2];
+
+            edges[0].x = tri[0].x;
+            edges[0].dx = (tri[2].x - tri[0].x) / (tri[2].y - tri[0].y);
+
+            edges[1].x = tri[0].x;
+            edges[1].dx = (tri[1].x - tri[0].x) / (tri[1].y - tri[0].y);
+
+            for (f64 y = tri[0].y; y <= tri[2].y; y += 1.0f) {
+                if (y > tri[1].y) {
+                    edges[1].dx = (tri[2].x - tri[1].x) / (tri[2].y - tri[1].y);
+                    edges[1].x = tri[1].x + (y - tri[1].y) * edges[1].dx;
+                }
+
+                for (f64 x = dx > 0.0f ? std::floor(edges[0].x) : std::ceil(edges[0].x);
+                     (dx > 0.0f && x <= edges[1].x) || (dx < 0.0f && x >= edges[1].x); x += dx) {
+                    f64 a = tri_normal.x, b = tri_normal.y, c = tri_normal.z,
+                        d = -dot(tri_normal, tri[0]);
+                    // printf("a: %f, b: %f, c: %f, d: %f\n", a, b, c, d);
+                    f64 z = std::floor((-1.0f / c) * (a * x + b * y + d));
+                    z = z < 0.0f ? 0.0f : z;
+                    // printf("x: %f, y: %f, z: %f\n", x, y, z);
+
+                    vec3 point = swizzle(vec3(x, y, z), 2 - dominant_axis_idx);
+                    size_t at = std::floor(point.x) * grid_size[1] * grid_size[2] +
+                                std::floor(point.y) * grid_size[2] + std::floor(point.z);
+
+                    if (!do_include_normals) {
+                        u8* voxels = static_cast<u8*>(grid.at(at));
+                        u8 bit_number = static_cast<i32>(point.z) % 8;
+                        u8 mask = 1 << bit_number;
+                        if (!(*voxels & mask)) {
+                            *voxels = *voxels | mask;
+                            voxels_n++;
+                        }
+                    } else {
+                        Voxel* voxel = static_cast<Voxel*>(grid.at(at));
+                        if (!voxel->valid) {
+                            voxel->valid = true;
+                            voxels_n++;
+                        }
+
+                        // update only max offset collision
+                        if (point.z + epsilon < voxel->max_coll_off) continue;
+
+                        f64 tri_normal_z = swizzle(tri_normal, 2 - dominant_axis_idx).z;
+                        Voxel::Type type;
+                        if (std::abs(tri_normal_z) < epsilon)
+                            type = Voxel::BOTH;
+                        else if (tri_normal_z < 0.0f)
+                            type = Voxel::OPENING;
+                        else if (tri_normal_z > 0.0f)
+                            type = Voxel::CLOSING;
+
+                        // new voxel or prev collision is less than current max collision is
+                        // updated
+                        if (voxel->max_type == Voxel::NONE || point.z > voxel->max_coll_off) {
+                            voxel->max_type = type;
+                            voxel->max_coll_off = point.z;
+                        } else if (type == Voxel::CLOSING) {
+                            voxel->max_type = type;
+                            voxel->max_coll_off = point.z;
+                        }
+                    }
+                }
+
+                for (auto& e : edges) e.x += e.dx;
+            }
         }
+    } else {
+        u32 diff = 0;
+        array<u32, 3> mesh_center {};
+        for (auto& t : triangles) {
+            vec3 tmin, tmax;
+            triangle_aabb(t, &tmin, &tmax);
 
-        vec3 tri_normal = cross(t[1] - t[0], t[2] - t[0]);
-        vec3 edges[3];
-        for (int i = 0; i < 3; i++) edges[i] = t[(i + 1) % 3] - t[i];
+            array<i32, 3> aligned_min, aligned_max;
+            for (int i = 0; i < 3; i++) {
+                aligned_min[i] = static_cast<i32>(progressive_floor(tmin[i]));
+                aligned_max[i] = static_cast<i32>(std::floor(tmax[i]));
+            }
 
-        for (i32 x = aligned_min[0]; x <= aligned_max[0]; x++) {
-            for (i32 y = aligned_min[1]; y <= aligned_max[1]; y++) {
-                for (i32 z = aligned_min[2]; z <= aligned_max[2]; z++) {
-                    auto at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
-                    vec3 min_voxel = vec3(x, y, z);
-                    array<vec3, 2> aabb = { min_voxel, min_voxel + 1.0f };
+            vec3 tri_normal = cross(t[1] - t[0], t[2] - t[0]);
+            vec3 edges[3];
+            for (int i = 0; i < 3; i++) edges[i] = t[(i + 1) % 3] - t[i];
 
-                    bool is_coll = triangle_aabb_collision_mt(t, tri_normal, edges, aabb);
-                    if (is_coll) {
-                        if (!do_include_normals) {
-                            u8* voxels = static_cast<u8*>(grid.at(at));
-                            u8 bit_number = z % 8;
-                            u8 mask = 1 << bit_number;
-                            if (!(*voxels & mask)) {
-                                *voxels = *voxels | mask;
-                                voxels_n++;
-                            }
-                        } else {
-                            Voxel* voxel = static_cast<Voxel*>(grid.at(at));
-                            if (!voxel->valid) {
-                                voxel->valid = true;
-                                voxels_n++;
-                            }
+            for (i32 x = aligned_min[0]; x <= aligned_max[0]; x++) {
+                for (i32 y = aligned_min[1]; y <= aligned_max[1]; y++) {
+                    for (i32 z = aligned_min[2]; z <= aligned_max[2]; z++) {
+                        auto at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
+                        vec3 min_voxel = vec3(x, y, z);
+                        array<vec3, 2> aabb = { min_voxel, min_voxel + 1.0f };
 
-                            auto colls = find_triangle_aabb_collision(t, edges, aabb);
-                            if (colls.empty()) continue; // the triangle is inside the aabb
+                        bool is_coll = triangle_aabb_collision_mt(t, tri_normal, edges, aabb);
+                        bool is_coll_ = triangle_aabb_collision(t, aabb);
 
-                            auto max_coll = *std::max_element(colls.cbegin(), colls.cend(),
-                                                              [](const vec3& l, const vec3& r) {
-                                                                  return l.z < r.z;
-                                                              });
+                        if (is_coll_) {
+                            if (!do_include_normals) {
+                                u8* voxels = static_cast<u8*>(grid.at(at));
+                                u8 bit_number = z % 8;
+                                u8 mask = 1 << bit_number;
+                                if (!(*voxels & mask)) {
+                                    *voxels = *voxels | mask;
+                                    voxels_n++;
+                                }
+                            } else {
+                                Voxel* voxel = static_cast<Voxel*>(grid.at(at));
+                                if (!voxel->valid) {
+                                    voxel->valid = true;
+                                    voxels_n++;
+                                }
 
-                            Voxel::Type type;
-                            if (std::abs(tri_normal.z) < epsilon)
-                                type = Voxel::BOTH;
-                            else if (tri_normal.z < 0.0f)
-                                type = Voxel::OPENING;
-                            else if (tri_normal.z > 0.0f)
-                                type = Voxel::CLOSING;
+                                auto colls = find_triangle_aabb_collision(t, edges, aabb);
+                                if (colls.empty()) continue; // the triangle is inside the aabb
 
-                            if (max_coll.z + epsilon < voxel->max_coll_off) continue;
-                            if (voxel->max_type == Voxel::NONE || max_coll.z > voxel->max_coll_off) {
-                                voxel->max_type = type;
-                                voxel->max_coll_off = max_coll.z;
-                            } else if (type == Voxel::CLOSING) { // epsilon included
-                                voxel->max_type = type;
-                                voxel->max_coll_off = max_coll.z;
+                                auto max_coll = *std::max_element(colls.cbegin(), colls.cend(),
+                                                                  [](const vec3& l, const vec3& r) {
+                                                                      return l.z < r.z;
+                                                                  });
+
+                                // update only max offset collision
+                                if (max_coll.z + epsilon < voxel->max_coll_off) continue;
+
+                                Voxel::Type type;
+                                if (std::abs(tri_normal.z) < epsilon)
+                                    type = Voxel::BOTH;
+                                else if (tri_normal.z < 0.0f)
+                                    type = Voxel::OPENING;
+                                else if (tri_normal.z > 0.0f)
+                                    type = Voxel::CLOSING;
+
+                                // new voxel or prev collision is less than current max collision is
+                                // updated
+                                if (voxel->max_type == Voxel::NONE || max_coll.z > voxel->max_coll_off) {
+                                    voxel->max_type = type;
+                                    voxel->max_coll_off = max_coll.z;
+                                }
+                                // collision points are equal, favor? closing triangles
+                                // FIXME: add left-of / right-of collision type to decide which
+                                // collision to favor
+                                else if (type == Voxel::CLOSING) {
+                                    voxel->max_type = type;
+                                    voxel->max_coll_off = max_coll.z;
+                                }
+                                /*
+                                   else if (max_coll.z == voxel->max_coll_off &&
+                                   max_coll.z == aabb[1].z) { if (type == Voxel::CLOSING) {
+                                   voxel->max_type = type; voxel->max_coll_off = max_coll.z;
+                                                                }
+                                                            }
+                                                            */
                             }
                         }
                     }
@@ -274,9 +405,11 @@ main(int argc, char* argv[])
 
     if (do_export == FORMAT::MAGICAVOXEL) {
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));
-        if (export_magicavoxel("bunny.vox", grid, grid_size, voxels_n, do_include_normals))
+
+        if (export_magicavoxel(out_filename, grid, grid_size, voxels_n, do_include_normals))
             assert(0 && "couldn't not open the vox file");
-        printf("voxels:\t%u\n", voxels_n);
+        // printf("voxels:\t%u\n", voxels_n);
+        // if (diff) printf("diff: %u\n", diff);
     } else
         export_raw(grid, grid_size, do_include_normals);
 
