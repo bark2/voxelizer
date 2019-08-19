@@ -9,7 +9,7 @@ LIBS = -lassimp
 OBJECTS = common.o iritSkel.o main.o obj.o
 HEADERS = $(wildcard *.h)
 
-vox: $(OBJECTS) $(HEADERS)
+vox: $(OBJECTS) $(HEADERS) Makefile
 	$(CC) $(LIBS) $(CFLAGS) -o vox $(OBJECTS) $(IRIT_LIBS) -lm
 clean:
 	rm -f *.o vox

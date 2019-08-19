@@ -20,6 +20,10 @@ swizzle(Vec v, int n = 1)
     return swizzle(v, n - 1);
 }
 
+template <typename T> int sign(T val) {
+    return (T(0) < val) - (val < T(0));
+}
+
 inline bool
 is_rat(f64 x)
 {

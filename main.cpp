@@ -123,7 +123,7 @@ main(int argc, char* argv[])
         const char* dot = strrchr(filename, '.');
         memcpy(out_filename, start, dot - start);
         strcpy(out_filename + (dot - start), ".vox");
-        printf("%s\n", out_filename);
+        // printf("%s\n", out_filename);
     }
 
     assert(strlen(out_filename) < IRIT_LINE_LEN_VLONG - 5);
@@ -218,59 +218,51 @@ main(int argc, char* argv[])
     u32 voxels_n = 0;
     if (true) {
         for (auto& tri : triangles) {
-            // printf("\ntri: %s %s %s\n", tri[0].to_string().c_str(), tri[1].to_string().c_str(),
-            // tri[2].to_string().c_str());
-            // printf("e1: %s\ne2: %s\n", (tri[1] - tri[0]).to_string().c_str(),
-            // (tri[2] - tri[0]).to_string().c_str());
-
             vec3 tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
-            // printf("normal: %s\n", tri_normal.to_string().c_str());
             const f64* dominant_axis =
                 std::max_element(tri_normal.begin(), tri_normal.end(),
                                  [](f64 lhs, f64 rhs) { return abs(lhs) < abs(rhs); });
             i32 dominant_axis_idx = dominant_axis - &tri_normal.x;
-
             for (auto& v : tri) v = swizzle(v, dominant_axis_idx + 1);
             tri_normal = swizzle(tri_normal, dominant_axis_idx + 1);
-
             std::sort(tri.begin(), tri.end(),
                       [](const vec3& lhs, const vec3& rhs) { return lhs.y < rhs.y; });
 
             // assume scanline: edge[0] -> edge[1]
-            f64 dx = signed_edge_function(tri[0], tri[2], true, tri[1]) > 0.0f ? -1.0f : 1.0f;
+            assert(tri[0].y < tri[2].y);
+            assert(tri[0].x != tri[1].x || tri[1].x != tri[2].x || tri[0].x != tri[2].x);
+            const f64 dx = signed_edge_function(tri[0], tri[2], true, tri[1]) > 0.0f ? -1.0f : 1.0f;
 
             struct Edge {
                 f64 x;
                 f64 dx;
             } edges[2];
 
-            edges[0].x = tri[0].x;
             edges[0].dx = (tri[2].x - tri[0].x) / (tri[2].y - tri[0].y);
+            edges[0].x = tri[0].x;
 
-            edges[1].x = tri[0].x;
             edges[1].dx = (tri[1].x - tri[0].x) / (tri[1].y - tri[0].y);
+            edges[1].x = (std::abs(edges[1].dx) == std::numeric_limits<f64>::infinity() ? tri[1].x : tri[0].x);
 
             for (f64 y = tri[0].y; y <= tri[2].y; y += 1.0f) {
-                if (y > tri[1].y) {
+                if (y > tri[1].y && y - 1.0f <= tri[1].y) {
                     edges[1].dx = (tri[2].x - tri[1].x) / (tri[2].y - tri[1].y);
                     edges[1].x = tri[1].x + (y - tri[1].y) * edges[1].dx;
                 }
 
-                for (f64 x = dx > 0.0f ? std::floor(edges[0].x) : std::ceil(edges[0].x);
-                     (dx > 0.0f && x <= edges[1].x) || (dx < 0.0f && x >= edges[1].x); x += dx) {
-                    f64 a = tri_normal.x, b = tri_normal.y, c = tri_normal.z,
-                        d = -dot(tri_normal, tri[0]);
-                    // printf("a: %f, b: %f, c: %f, d: %f\n", a, b, c, d);
+                for (f64 x = progressive_floor(std::min(edges[0].x, edges[1].x));
+                     x <= std::max(edges[0].x, edges[1].x); x += 1.0f) {
+                    const f64 a = tri_normal.x, b = tri_normal.y, c = tri_normal.z,
+                              d = -dot(tri_normal, tri[0]);
                     f64 z = std::floor((-1.0f / c) * (a * x + b * y + d));
-                    z = z < 0.0f ? 0.0f : z;
-                    // printf("x: %f, y: %f, z: %f\n", x, y, z);
+                    if (z < 0.0f) continue;
 
                     vec3 point = swizzle(vec3(x, y, z), 2 - dominant_axis_idx);
                     size_t at = std::floor(point.x) * grid_size[1] * grid_size[2] +
                                 std::floor(point.y) * grid_size[2] + std::floor(point.z);
 
                     if (!do_include_normals) {
-                        u8* voxels = static_cast<u8*>(grid.at(at));
+                        u8* voxels = reinterpret_cast<u8*>(grid.at(at));
                         u8 bit_number = static_cast<i32>(point.z) % 8;
                         u8 mask = 1 << bit_number;
                         if (!(*voxels & mask)) {
@@ -278,7 +270,7 @@ main(int argc, char* argv[])
                             voxels_n++;
                         }
                     } else {
-                        Voxel* voxel = static_cast<Voxel*>(grid.at(at));
+                        Voxel* voxel = reinterpret_cast<Voxel*>(grid.at(at));
                         if (!voxel->valid) {
                             voxel->valid = true;
                             voxels_n++;
@@ -336,9 +328,9 @@ main(int argc, char* argv[])
                         array<vec3, 2> aabb = { min_voxel, min_voxel + 1.0f };
 
                         bool is_coll = triangle_aabb_collision_mt(t, tri_normal, edges, aabb);
-                        bool is_coll_ = triangle_aabb_collision(t, aabb);
+                        // bool is_coll_ = triangle_aabb_collision(t, aabb);
 
-                        if (is_coll_) {
+                        if (is_coll) {
                             if (!do_include_normals) {
                                 u8* voxels = static_cast<u8*>(grid.at(at));
                                 u8 bit_number = z % 8;
@@ -408,7 +400,7 @@ main(int argc, char* argv[])
 
         if (export_magicavoxel(out_filename, grid, grid_size, voxels_n, do_include_normals))
             assert(0 && "couldn't not open the vox file");
-        // printf("voxels:\t%u\n", voxels_n);
+        printf("voxels:\t%u\n", voxels_n);
         // if (diff) printf("diff: %u\n", diff);
     } else
         export_raw(grid, grid_size, do_include_normals);
