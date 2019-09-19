@@ -1,12 +1,14 @@
 #pragma once
 
-#include "types.h"
+#include "voxelizer.h"
+#include <array>
 #include <cstdio>
+#include <vector>
 
-std::vector<Mesh> load_file(const std::string& filename);
-int export_magicavoxel(const char* filename,
-                       const Array& grid,
-                       array<i32, 3> grid_size,
-                       u32 voxels_n,
-                       bool is_normal_included);
-int export_raw(const Array& grid, array<i32, 3> grid_size, bool is_normal_included);
+void load_file(const std::string& filename);
+int  export_magicavoxel(const char*          filename,
+                        const unsigned char  grid[],
+                        std::array<int, 3>   grid_size,
+                        int                  voxels_n,
+                        Voxelizer::VoxelMeta data[] = nullptr);
+int export_raw(const unsigned char grid[], std::array<int, 3> grid_size);

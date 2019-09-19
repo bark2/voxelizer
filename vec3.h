@@ -7,7 +7,9 @@
 #include <iostream>
 #include <stdlib.h>
 
-using f64 = double;
+namespace IVoxelizer {
+
+using f64 = float;
 
 struct vec3 {
     union {
@@ -200,3 +202,5 @@ unit(vec3 v)
 }
 
 inline vec3 operator*(const f64 a, const vec3& v) { return vec3(a * v.v[0], a * v.v[1], a * v.v[2]); }
+
+}

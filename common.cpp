@@ -1,19 +1,18 @@
 #include "common.h"
 
-std::string strtok(const std::string& s, const std::string& subs,
-    size_t& start)
+namespace IVoxelizer {
+
+std::string
+strtok(const std::string& s, const std::string& subs, size_t& start)
 {
     std::string result;
     size_t i = start;
     if (subs.find(s.at(start)) != std::string::npos) {
-        while (i < s.length() && subs.find(s.at(i)) != std::string::npos) {
-            i++;
-        }
+        while (i < s.length() && subs.find(s.at(i)) != std::string::npos) { i++; }
         start = i;
     }
 
-    while (i < s.length() && subs.find(s.at(i)) == std::string::npos)
-        i++;
+    while (i < s.length() && subs.find(s.at(i)) == std::string::npos) i++;
 
     assert(start != i || start == s.length());
     if (start == i && i >= s.length())
@@ -23,8 +22,8 @@ std::string strtok(const std::string& s, const std::string& subs,
     return result;
 }
 
-std::string strtok_update(const std::string& s, const std::string& subs,
-    size_t& start)
+std::string
+strtok_update(const std::string& s, const std::string& subs, size_t& start)
 {
     std::string result = strtok(s, subs, start);
     start += result.length();
@@ -33,3 +32,4 @@ std::string strtok_update(const std::string& s, const std::string& subs,
 
 // todo: add a vector print function
 
+}

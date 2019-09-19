@@ -6,13 +6,14 @@ include $(IRIT_DIR)/makeflag.unx
 CC         = g++
 CFLAGS = -Wc++11-compat -Wextra -std=c++11 -O0 -g -DAI
 LIBS = -lassimp
-OBJECTS = common.o iritSkel.o main.o obj.o
+OBJECTS = common.o iritSkel.o obj.o voxelizer.o
 HEADERS = $(wildcard *.h)
 
-vox: $(OBJECTS) $(HEADERS) Makefile
-	$(CC) $(LIBS) $(CFLAGS) -o vox $(OBJECTS) $(IRIT_LIBS) -lm
+voxelizer: $(OBJECTS) $(HEADERS) Makefile main.o
+	$(CC) $(LIBS) $(CFLAGS) $(IRIT_LIBS) -lm -o vox $(OBJECTS) main.o
+	ar rcs libvoxelizer.a voxelizer.o
 clean:
-	rm -f *.o vox
+	rm -f *.o vox *.a
 
 %.o: %.cpp $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@

@@ -8,19 +8,33 @@
 #include <tuple>
 #include <utility>
 
+namespace IVoxelizer {
+
 const f64 epsilon = 1.0E-8f;
 
 template <typename Vec>
 inline Vec
 swizzle(Vec v, int n = 1)
 {
-    if (!n) return v;
-
-    for (typename Vec::size_type i = 0; i < v.size() - 1; i++) std::swap(v[i], v[(i + 1) % v.size()]);
-    return swizzle(v, n - 1);
+    for (int j = 0; j < n; j++)
+        for (typename Vec::size_type i = 0; i < v.size() - 1; i++)
+            std::swap(v[i], v[(i + 1) % v.size()]);
+    return v;
 }
 
-template <typename T> int sign(T val) {
+inline void
+swizzle(f64* v, size_t length, int n = 1)
+{
+    n = n % 3;
+
+    for (auto j = 0; j < n; j++)
+        for (size_t i = 0; i < length - 1; i++) std::swap(v[i], v[(i + 1) % length]);
+}
+
+template <typename T>
+int
+sign(T val)
+{
     return (T(0) < val) - (val < T(0));
 }
 
@@ -31,7 +45,7 @@ is_rat(f64 x)
 }
 
 inline f64
-signed_edge_function(const vec2& v0, const vec2& v1, const bool back_facing, const vec2& test_point)
+signed_edge_function(const vec2& v0, const vec2& v1, bool back_facing, const vec2& test_point)
 {
     f64 d = back_facing ? 1.0f : -1.0f;
     vec2 edge = v1 - v0;
@@ -40,7 +54,7 @@ signed_edge_function(const vec2& v0, const vec2& v1, const bool back_facing, con
 }
 
 inline f64
-signed_edge_function(const array<vec2, 2>& e1, const bool back_facing, const vec2& test_point)
+signed_edge_function(const array<vec2, 2>& e1, bool back_facing, const vec2& test_point)
 {
     return signed_edge_function(e1[0], e1[1], back_facing, test_point);
 }
@@ -76,7 +90,7 @@ is_point_in_triangle(const array<vec2, 3>& proj_triangle, bool back_facing, cons
     return result;
 }
 
-bool
+inline bool
 is_point_in_aabb(const array<vec3, 2>& aabb, const vec3& v)
 {
     return (v.x >= aabb[0].x && v.y >= aabb[0].y && v.z >= aabb[0].z && v.x <= aabb[1].x &&
@@ -607,4 +621,6 @@ inline f64
 progressive_ceil(f64 f, f64 max)
 {
     return std::min(max, f == std::ceil(f) ? f + 1 : std::ceil(f));
+}
+
 }

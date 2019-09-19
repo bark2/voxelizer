@@ -1,10 +1,8 @@
 // #include "stdafx.h"
 #include "iritSkel.h"
 #include "types.h"
-
-extern vec3 scene_aabb_min;
-extern vec3 scene_aabb_max;
-extern std::vector<Triangle> triangles;
+#include <array>
+#include <vector>
 
 /*****************************************************************************
  * Skeleton for an interface to a parser to read IRIT data files.			 *
@@ -55,8 +53,7 @@ CGSkelProcessIritDataFiles(const char* file_name)
 
     /* Get the data files: */
     IPSetFlattenObjects(FALSE);
-    if ((PObjects = IPGetDataFiles(&file_name, 1 /*NumFiles*/, TRUE, FALSE)) == NULL)
-        return false;
+    if ((PObjects = IPGetDataFiles(&file_name, 1 /*NumFiles*/, TRUE, FALSE)) == NULL) return false;
     PObjects = IPResolveInstances(PObjects);
 
     if (IPWasPrspMat)
@@ -113,11 +110,14 @@ CGSkelDumpOneTraversedObject(IPObjectStruct* PObj, IrtHmgnMatType Mat, void* Dat
  * RETURN VALUE:                                                              *
  *   bool:		false - fail, true - success.                                *
  *****************************************************************************/
+
 bool
 CGSkelStoreData(IPObjectStruct* PObj)
 {
-    extern vec3 scene_aabb_min;
-    extern vec3 scene_aabb_max;
+    using IVoxelizer::Triangle;
+
+    extern float scene_aabb_min[3];
+    extern float scene_aabb_max[3];
     extern std::vector<Triangle> triangles;
     int i;
     const char* Str;
@@ -149,9 +149,9 @@ CGSkelStoreData(IPObjectStruct* PObj)
         }
     }
 
-    int triangles_n = 0;
-    for (PPolygon = PObj->U.Pl; PPolygon != NULL; PPolygon = PPolygon->Pnext) triangles_n++;
-    triangles.reserve(triangles_n);
+    int triangle_count = 0;
+    for (PPolygon = PObj->U.Pl; PPolygon != NULL; PPolygon = PPolygon->Pnext) triangle_count++;
+    triangles.reserve(triangle_count);
 
     for (PPolygon = PObj->U.Pl; PPolygon != NULL; PPolygon = PPolygon->Pnext) {
         if (PPolygon->PVertex == NULL) {
@@ -159,19 +159,12 @@ CGSkelStoreData(IPObjectStruct* PObj)
             return false;
         }
 
-        /* Count number of vertices. */
-        for (PVertex = PPolygon->PVertex->Pnext, i = 1; PVertex != PPolygon->PVertex && PVertex != NULL;
-             PVertex = PVertex->Pnext, i++)
-            ;
-        /* use if(IP_HAS_PLANE_POLY(PPolygon)) to know whether a normal is defined for the polygon
-           access the normal by the first 3 components of PPolygon->Plane */
-
         Triangle t;
         int vi = 0;
         PVertex = PPolygon->PVertex;
         do {
             for (int j = 0; j < 3; j++) {
-                f64 x = PVertex->Coord[j];
+                float x = PVertex->Coord[j];
                 scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
                 scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
                 if (vi < 3)

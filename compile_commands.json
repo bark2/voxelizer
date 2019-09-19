@@ -3,58 +3,85 @@
         "arguments": [
             "c++",
             "-c",
-            "-W",
+            "-Wc++11-compat",
+            "-Wextra",
+            "-std=c++11",
             "-O0",
             "-g",
-            "-std=c++11",
-            "-I./",
-            "voxelizer.cc"
-        ],
-        "directory": "/home/bar/Programming/Projects/voxelizer",
-        "file": "voxelizer.cc"
-    },
-    {
-        "arguments": [
-            "c++",
-            "-c",
-            "-W",
-            "-O0",
-            "-g",
-            "-std=c++11",
-            "-I./",
-            "triangle.cc"
-        ],
-        "directory": "/home/bar/Programming/Projects/voxelizer",
-        "file": "triangle.cc"
-    },
-    {
-        "arguments": [
-            "c++",
-            "-c",
-            "-W",
-            "-O0",
-            "-g",
-            "-std=c++11",
-            "-I./",
-            "obj.cc"
-        ],
-        "directory": "/home/bar/Programming/Projects/voxelizer",
-        "file": "obj.cc"
-    },
-    {
-        "arguments": [
-            "c++",
-            "-c",
+            "-DAI",
             "-o",
-            "vox",
-            "voxelizer.o",
+            "main.o",
+            "main.cpp"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "main.cpp"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-Wc++11-compat",
+            "-Wextra",
+            "-std=c++11",
+            "-O0",
+            "-g",
+            "-DAI",
+            "-o",
             "obj.o",
-            "triangle.o",
+            "obj.cpp"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "obj.cpp"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-Wc++11-compat",
+            "-Wextra",
+            "-std=c++11",
+            "-O0",
+            "-g",
+            "-DAI",
+            "-o",
             "common.o",
-            "/home/bar/Programming/Projects/voxelizer/irit/irit-sm/circlink/circlink.oD",
+            "common.cpp"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "common.cpp"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-Wc++11-compat",
+            "-Wextra",
+            "-std=c++11",
+            "-O0",
+            "-g",
+            "-DAI",
+            "-o",
+            "iritSkel.o",
             "iritSkel.cpp"
         ],
         "directory": "/home/bar/Programming/Projects/voxelizer",
         "file": "iritSkel.cpp"
+    },
+    {
+        "arguments": [
+            "c++",
+            "-c",
+            "-Wc++11-compat",
+            "-Wextra",
+            "-std=c++11",
+            "-O0",
+            "-g",
+            "-DAI",
+            "-o",
+            "voxelizer.o",
+            "voxelizer.cpp"
+        ],
+        "directory": "/home/bar/Programming/Projects/voxelizer",
+        "file": "voxelizer.cpp"
     }
 ]

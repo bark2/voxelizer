@@ -4,7 +4,9 @@
 #include <iostream>
 #include <stdlib.h>
 
-using f64 = double;
+namespace IVoxelizer {
+
+using f64 = float;
 
 struct vec2 {
     union {
@@ -134,3 +136,5 @@ unit_vector(vec2 v)
 }
 
 inline vec2 operator*(const f64 a, const vec2& v) { return vec2(a * v.v[0], a * v.v[1]); }
+
+}
