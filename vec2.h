@@ -6,7 +6,7 @@
 
 namespace IVoxelizer {
 
-using f64 = float;
+using f64 = double;
 
 struct vec2 {
     union {

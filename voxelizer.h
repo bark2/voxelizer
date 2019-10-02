@@ -6,37 +6,25 @@
 
 namespace Voxelizer {
 
-template <unsigned N> struct IVoxelMeta {
-    struct static_array {
-        std::array<int, N> ids;
-        size_t             count = 0;
+    enum { SUCCESS, ERROR_NO_DATA_BUFFER, ERROR_VOXEL_WITHOUT_A_MATCH };
 
-        inline void
-        push_back(int idx)
-        {
-            if (count != N) ids[count++] = idx;
-        }
+enum VoxelType : unsigned char { NONE, CROUDED, CLOSING, OPENING, BOTH };
 
-        inline bool
-        is_empty()
-        {
-            return (ids == 0);
-        }
-    } ids;
-    enum Type { CROUDED, CLOSING, OPENING, BOTH } type;
-};
-using VoxelMeta = IVoxelMeta<6>;
+size_t size_of_voxel_type_with_collision();
+size_t size_of_voxel_type();
 
-int voxelize(unsigned char output_grid[],
-             int           grid_size_x,
-             int           grid_size_y,
-             int           grid_size_z,
-             float (*meshes[])[3][3],
-             size_t    meshes_size[],
-             size_t    meshes_count,
-             bool      flip_normals     = false,
-             float     triangles_min[3] = nullptr,
-             float     triangles_max[3] = nullptr,
-             bool      flood_fill       = false,
-             VoxelMeta metadata[]       = nullptr);
+char voxelize(unsigned char output_grid[],
+              unsigned int* voxel_count,
+              int           grid_size_x,
+              int           grid_size_y,
+              int           grid_size_z,
+              double (*meshes[])[3][3],
+              size_t        meshes_size[],
+              size_t        meshes_count,
+              bool          flip_normals            = false,
+              double        triangles_min[3]        = nullptr,
+              double        triangles_max[3]        = nullptr,
+              bool          flood_fill              = false,
+              bool          use_collision_detection = false,
+              unsigned char metadata[]              = nullptr);
 }

@@ -23,16 +23,10 @@ using std::vector;
 
 using Triangle = array<vec3, 3>;
 
-struct Voxel_ {
-    bool valid;
-    enum Type { NONE, CLOSING, OPENING, BOTH } max_type;
+struct VoxelData {
     f64 max_coll_off;
+    enum Type { NONE = 0, CLOSING, OPENING, BOTH } max_type;
 };
-
-// struct VoxelMeta {
-    // u32 idx;
-    // enum Type { CROUDED, CLOSING, OPENING, BOTH } type;
-// };
 
 inline void
 set_voxel(u8* base, size_t voxel_num, bool value = true)

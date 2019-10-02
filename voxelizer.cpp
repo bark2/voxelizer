@@ -10,93 +10,88 @@
 #include <utility>
 
 using namespace IVoxelizer;
-using Voxelizer::VoxelMeta;
+using Voxelizer::VoxelType;
 
-void
-flood_fill_rec(
-    std::vector<Voxel_>& grid, const array<i32, 3>& grid_size, u32& voxels_n, i32 x, i32 y, i32 z)
+u8
+flood_fill_rast_collision_detection(u8                   grid[],
+                                    VoxelData            data[],
+                                    const array<i32, 3>& grid_size,
+                                    unsigned int*        voxel_count)
 {
-    if (x < 0 || y < 0 || z < 0 || x >= grid_size.at(0) || y >= grid_size.at(1) || z >= grid_size.at(2))
-        return;
-    if (grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z).valid) return;
+    u8 result = Voxelizer::SUCCESS;
 
-    grid.at(x * grid_size[1] * grid_size[2] + y * grid_size[2] + z).valid = true;
-    voxels_n++;
-
-    flood_fill_rec(grid, grid_size, voxels_n, x, y, z + 1);
-    flood_fill_rec(grid, grid_size, voxels_n, x, y, z - 1);
-    flood_fill_rec(grid, grid_size, voxels_n, x, y + 1, z);
-    flood_fill_rec(grid, grid_size, voxels_n, x, y - 1, z);
-    flood_fill_rec(grid, grid_size, voxels_n, x + 1, y, z);
-    flood_fill_rec(grid, grid_size, voxels_n, x - 1, y, z);
-}
-
-void
-flood_fill_rast(Voxel_* grid, const array<i32, 3>& grid_size, i32* voxels_n)
-{
+    *voxel_count = 0;
     struct {
-        Voxel_::Type type;
-        i32          z;
+        VoxelData::Type type;
+        i32             z;
     } last;
-
     for (i32 x = 0; x < grid_size[0]; x++) {
         for (i32 y = 0; y < grid_size[1]; y++) {
-            last = { Voxel_::CLOSING, std::numeric_limits<i32>::max() };
+            last = { VoxelData::CLOSING, std::numeric_limits<i32>::max() };
             for (i32 z = 0; z < grid_size[2]; z++) {
-                i32     at    = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
-                Voxel_* voxel = &((Voxel_*)grid)[at];
+                i32        at    = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
+                VoxelData* voxel = &data[at];
 
-                if (voxel->valid) { // NONE || BOTH || CLOSING
+                if (get_voxel(grid, at)) { // NONE || BOTH || CLOSING
                     last = { voxel->max_type, z };
-                } else if (last.type == Voxel_::OPENING && z > last.z) {
-                    voxel->valid = true;
-                    (*voxels_n)++;
+                    (*voxel_count)++;
+                }
+                else if (last.type == VoxelData::OPENING && z > last.z) {
+                    set_voxel(grid, at, true);
+                    (*voxel_count)++;
                 }
             }
 
-            if (last.type == Voxel_::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
+            if (last.type == VoxelData::OPENING) {
+                printf("Warning: voxel with no closing match, (%d %d %d)\n", x, y, last.z);
+                result = Voxelizer::ERROR_VOXEL_WITHOUT_A_MATCH;
+            }
         }
     }
+
+    return result;
 }
 
-i32
-flood_fill_rast2(u8 grid[], VoxelMeta data[], const array<i32, 3>& grid_size)
+u32
+flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
 {
-    i32 voxel_count = 0;
+    u32 voxel_count = 0;
 
     struct {
-        VoxelMeta::Type type;
-        i32             y;
+        VoxelType type;
+        i32       y;
     } last;
 
     for (i32 z = 0; z < grid_size[0]; z++) {
         for (i32 x = 0; x < grid_size[1]; x++) {
-            last = { VoxelMeta::CLOSING, std::numeric_limits<i32>::max() };
+            last = { VoxelType::CLOSING, std::numeric_limits<i32>::max() };
             for (i32 y = 0; y < grid_size[2]; y++) {
-                i32             voxel_num = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
-                VoxelMeta::Type type      = data[voxel_num].type;
+                i32       voxel_num = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
+                VoxelType type      = data[voxel_num];
                 if (get_voxel(grid, voxel_num)) {
                     switch (type) {
-                    case VoxelMeta::OPENING: {
-                        last.type = VoxelMeta::OPENING;
+                    case VoxelType::OPENING: {
+                        last.type = VoxelType::OPENING;
                         last.y    = y;
                         voxel_count++;
                     }; break;
-                    case VoxelMeta::CROUDED: {
+                    case VoxelType::CROUDED: {
                         // voxel_count isn't incremented
                         set_voxel(grid, voxel_num, false);
                     }; break;
-                    case VoxelMeta::CLOSING: {
-                        last.type = VoxelMeta::CLOSING;
+                    case VoxelType::CLOSING: {
+                        last.type = VoxelType::CLOSING;
                         last.y    = y;
                         voxel_count++;
                     }; break;
-                    case VoxelMeta::BOTH: {
+                    case VoxelType::BOTH: {
                         voxel_count++;
                         last.y = y;
                     } break;
+                    case VoxelType::NONE: assert(0);
                     }
-                } else if (last.type == VoxelMeta::OPENING && y > last.y) {
+                }
+                else if (last.type == VoxelType::OPENING && y > last.y) {
                     set_voxel(grid, voxel_num, true);
                     voxel_count++;
                 }
@@ -109,99 +104,76 @@ flood_fill_rast2(u8 grid[], VoxelMeta data[], const array<i32, 3>& grid_size)
     return voxel_count;
 }
 
-void
-grid_cut(std::vector<Voxel_>& grid,
-         const array<i32, 3>& grid_size,
-         i32&                 voxels_n,
-         const array<i32, 3>& threshold)
-{
-    for (i32 x = 0; x < grid_size[0]; x++) {
-        for (i32 y = 0; y < grid_size[1]; y++) {
-            for (i32 z = 0; z < grid_size[2]; z++) {
-                i32 at = x * grid_size[1] * grid_size[2] + y * grid_size[2] + z;
-                if (x >= threshold[0] && y >= threshold[1] && z >= threshold[2] && grid.at(at).valid) {
-                    grid.at(at).valid = false;
-                    voxels_n--;
-                }
-            }
-        }
-    }
-}
-
+extern unsigned int qtri;
 static inline bool
 write_voxel(u8                   grid[],
-            VoxelMeta            data[],
+            Voxelizer::VoxelType data[],
             const array<i32, 3>& grid_size,
             const vec3&          p,
-            VoxelMeta::Type      type,
-            unsigned int         tri_idx,
+            Voxelizer::VoxelType type,
             bool                 flood_fill)
 {
     bool   new_voxel = false;
-    size_t voxel_num = std::floor(p[0]) * grid_size[1] * grid_size[2] + std::floor(p[1]) * grid_size[2] +
-                       std::floor(p[2]);
+    size_t voxel_num =
+        floor(p[0]) * grid_size[1] * grid_size[2] + floor(p[1]) * grid_size[2] + floor(p[2]);
 
     if (!get_voxel(grid, voxel_num)) {
         new_voxel = true;
         set_voxel(grid, voxel_num);
-        if (data || flood_fill) {
-            data[voxel_num].ids.push_back(tri_idx);
-            data[voxel_num].type = type;
-        }
-    } else if (data || flood_fill) {
-        data[voxel_num].ids.push_back(tri_idx);
-        VoxelMeta::Type ctype = data[voxel_num].type;
-        // if (ctype != type && type != VoxelMeta::BOTH && ctype != VoxelMeta::BOTH)
-        // data[voxel_num].type = VoxelMeta::CROUDED;
-        if ((ctype == VoxelMeta::Type::OPENING && type == VoxelMeta::Type::CLOSING) ||
-            (ctype == VoxelMeta::Type::CLOSING && type == VoxelMeta::Type::OPENING))
-            data[voxel_num].type = VoxelMeta::CROUDED;
+        if (data || flood_fill) data[voxel_num] = type;
+    }
+    else if (data || flood_fill) {
+        Voxelizer::VoxelType ctype = data[voxel_num];
+        if ((ctype == Voxelizer::VoxelType::OPENING && type == Voxelizer::VoxelType::CLOSING) ||
+            (ctype == Voxelizer::VoxelType::CLOSING && type == Voxelizer::VoxelType::OPENING))
+            data[voxel_num] = Voxelizer::VoxelType::CROUDED;
     }
 
     return new_voxel;
 }
 
-int
+char
 Voxelizer::voxelize(unsigned char grid[],
+                    unsigned int* voxel_count,
                     int           grid_size_x,
                     int           grid_size_y,
                     int           grid_size_z,
-                    float (*meshes[])[3][3],
-                    size_t    meshes_size[],
-                    size_t    meshes_count,
-                    bool      flip_normals,
-                    float     triangles_min[3],
-                    float     triangles_max[3],
-                    bool      flood_fill,
-                    VoxelMeta data[])
+                    double (*meshes[])[3][3],
+                    size_t        meshes_size[],
+                    size_t        meshes_count,
+                    bool          flip_normals,
+                    double        triangles_min[3],
+                    double        triangles_max[3],
+                    bool          flood_fill,
+                    bool          use_collision_detection,
+                    unsigned char data[])
 {
-    assert(!flood_fill || data);
+    if (flood_fill && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
+    if (use_collision_detection && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
 
     if (!triangles_min || !triangles_max) {
-        f64 triangles_min_tmp[3] = { std::numeric_limits<f64>::max(), std::numeric_limits<f64>::max(),
-                                     std::numeric_limits<f64>::max() };
-        f64 triangles_max_tmp[3] = { -std::numeric_limits<f64>::max(), -std::numeric_limits<f64>::max(),
-                                     -std::numeric_limits<f64>::max() };
+        triangles_min = (double*)malloc(sizeof(triangles_min[0]) * 3);
+        triangles_max = (double*)malloc(sizeof(triangles_max[0]) * 3);
+        for (int i = 0; i < 3; i++) {
+            triangles_min[i] = std::numeric_limits<f64>::max();
+            triangles_max[i] = -std::numeric_limits<f64>::max();
+        }
+
         for (unsigned int m = 0; m < meshes_count; m++)
-            for (unsigned int i = 0; i < meshes_size[m]; i++) {
-                for (i32 k = 0; k < 3; k++) {
+            for (unsigned int i = 0; i < meshes_size[m]; i++)
+                for (i32 k = 0; k < 3; k++)
                     for (i32 j = 0; j < 3; j++) {
-                        triangles_max_tmp[j] = std::max(triangles_max_tmp[j], meshes[m][i][k][j]);
-                        triangles_min_tmp[j] = std::min(triangles_min_tmp[j], meshes[m][i][k][j]);
+                        triangles_max[j] = std::max(triangles_max[j], meshes[m][i][k][j]);
+                        triangles_min[j] = std::min(triangles_min[j], meshes[m][i][k][j]);
                     }
-                }
-            }
-        triangles_max = triangles_max_tmp;
-        triangles_min = triangles_min_tmp;
     }
 
-    array<i32, 3> grid_size { grid_size_z, grid_size_x, grid_size_y };
-    // swizzle(triangles_min, 3, 2);
-    // swizzle(triangles_max, 3, 2);
-    f64 triangles_min_min = std::min({ triangles_min[0], triangles_min[1], triangles_min[2] });
-    f64 factor =
-        std::max(triangles_max[0] - triangles_min[0],
-                 std::max(triangles_max[1] - triangles_min[1], triangles_max[2] - triangles_min[2]));
+    array<i32, 3> grid_size         = { grid_size_z, grid_size_x, grid_size_y };
+    f64           triangles_min_min = std::min({ triangles_min[0], triangles_min[1], triangles_min[2] });
+    f64           triangles_max_max = std::max({ triangles_max[0], triangles_max[1], triangles_max[2] });
+    f64           normilization_factor =
+        std::max({ triangles_max[0] - triangles_min[0], triangles_max[1] - triangles_min[1],
+                   triangles_max[2] - triangles_min[2] });
 
     // normalize triangles
     for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
@@ -210,216 +182,149 @@ Voxelizer::voxelize(unsigned char grid[],
 
             if (flip_normals) std::swap(tri[1], tri[2]);
             for (auto& v : tri) {
-                // v = swizzle(v, 2);
+                // saves the headache of finding the grid voxel for each point
+                // for (i32 i = 0; i < 3; i++) {
+                // normalize to[0.0, grid_size - 1.0]
+                // v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) / normilization_factor;
+                // }
+                // v = { v.z, v.x, v.y };
+
+                v = { v.z, v.x, v.y };
                 // saves the headache of finding the grid voxel for each point
                 for (i32 i = 0; i < 3; i++) {
                     // normalize to[0.0f, grid_size - 1.0f]
-                    v[i] = (grid_size[i] - 1.0f) * (v[i] - triangles_min[i]) / factor;
+                    v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) /
+                           (triangles_max_max - triangles_min_min);
                 }
             }
         }
     }
 
-    i32 voxel_count = 0;
-    if (true) {
+    *voxel_count = 0;
+    if (!use_collision_detection) {
         for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
             for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
-                Triangle& tri = *(Triangle*)(&meshes[mesh_it][tri_it]);
-                // printf("tri[0]=%s tri[1]=%s tri[2]=%s ", tri[0].to_string().c_str(),
-                // tri[1].to_string().c_str(), tri[2].to_string().c_str());
-
-                vec3 tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
-                // printf("normal=%s\n", tri_normal.to_string().c_str());
-                VoxelMeta::Type type;
-                if (data || flood_fill) {
+                Triangle& tri        = *(Triangle*)(&meshes[mesh_it][tri_it]);
+                vec3      tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
+                VoxelType type;
+                if (flood_fill) {
                     if (std::abs(tri_normal.z) < epsilon)
-                        type = VoxelMeta::BOTH;
-                    else if (tri_normal.z < 0.0f)
-                        type = VoxelMeta::OPENING;
-                    else if (tri_normal.z > 0.0f)
-                        type = VoxelMeta::CLOSING;
+                        type = VoxelType::BOTH;
+                    else if (tri_normal.z < 0.0)
+                        type = VoxelType::OPENING;
+                    else if (tri_normal.z > 0.0)
+                        type = VoxelType::CLOSING;
                 }
 
                 const f64* dominant_axis =
                     std::max_element(tri_normal.begin(), tri_normal.end(),
                                      [](f64 lhs, f64 rhs) { return abs(lhs) < abs(rhs); });
                 i8 xi = 0, yi = 1, zi = dominant_axis - &tri_normal.x;
-                if (zi == xi) xi = 2;
-                if (zi == yi) yi = 2;
+                if (zi == xi)
+                    xi = 2;
+                else if (zi == yi)
+                    yi = 2;
                 assert(xi != yi && yi != zi && xi != zi);
-                                
-                f64 min_x = tri[0].x, max_x = tri[0].x, min_y = tri[0].y, max_y = tri[0].y;
-                for (u8 vi = 1; vi < 3; vi++) {
-                    min_x = std::min(min_x, tri[vi][xi]);
-                    max_x = std::max(max_x, tri[vi][xi]);
-                    min_y = std::min(min_y, tri[vi][yi]);
-                    max_y = std::max(max_y, tri[vi][yi]);
-                }
-                if (max_x - min_x > max_y - min_y) {
-                    // printf("swapped: ");
-                    std::swap(xi, yi);
-                }
 
-                // printf("xi=%d yi=%d zi=%d\n", xi, yi, zi);
-                std::sort(tri.begin(), tri.end(),
-                          [=](const vec3& lhs, const vec3& rhs) { return lhs[yi] < rhs[yi]; });
+                for (int dir_iter = 0; dir_iter < 2; dir_iter++, std::swap(xi, yi)) {
+                    std::sort(tri.begin(), tri.end(),
+                              [=](const vec3& lhs, const vec3& rhs) { return lhs[yi] < rhs[yi]; });
 
-                struct Edge {
-                    f64 x;
-                    f64 dx;
-                } edges[2];
+                    // printf("\n");
+                    // printf("tri: %u ", tri_it);
+                    // for (auto& v : tri) printf("%s ", v.to_string().c_str());
+                    // printf("\n");
 
-                edges[0].dx = (tri[2][xi] - tri[0][xi]) / (tri[2][yi] - tri[0][yi]);
-                edges[0].x  = tri[0][xi];
+                    const f64 a    = tri_normal[xi];
+                    const f64 b    = tri_normal[yi];
+                    const f64 c    = tri_normal[zi];
+                    const f64 d    = -dot(tri_normal, tri[0]);
+                    const f64 dzdx = -a / c;
+                    const f64 dzdy = -b / c;
+                    const f64 w    = -d / c;
 
-                bool horizontal_first_edge = (tri[0][yi] == tri[1][yi]);
-                if (horizontal_first_edge) {
-                    edges[1].dx = (tri[2][xi] - tri[1][xi]) / (tri[2][yi] - tri[1][yi]);
-                    edges[1].x  = tri[1][xi];
-                } else {
-                    edges[1].dx = (tri[1][xi] - tri[0][xi]) / (tri[1][yi] - tri[0][yi]);
-                    edges[1].x  = tri[0][xi];
-                }
-                // printf("edges[0].dx=%f edges[1].dx=%f\n", edges[0].dx, edges[1].dx);
-                const f64 y_presition = 1;
-                for (f64 y = tri[0][yi]; y <= tri[2][yi]; y += 1.0f / y_presition) {
-                    if (y >= tri[1][yi] && y - 1.0f < tri[1][yi]) {
-                        edges[1].dx = (tri[2][xi] - tri[1][xi]) / (tri[2][yi] - tri[1][yi]);
-                        edges[1].x  = tri[1][xi] + (y - tri[1][yi]) * edges[1].dx;
-                        // printf("next edges[1].dx=%f\n", edges[1].dx);
+                    const f64 dx[3] = {
+                        (tri[2][xi] - tri[0][xi]) / (tri[2][yi] - tri[0][yi]), //
+                        (tri[1][xi] - tri[0][xi]) / (tri[1][yi] - tri[0][yi]), //
+                        (tri[2][xi] - tri[1][xi]) / (tri[2][yi] - tri[1][yi])  //
+                    };
+
+                    struct Edge {
+                        f64 x;
+                        f64 dx;
+                    } edges[2];
+
+                    edges[0].dx = dx[0];
+                    edges[0].x  = tri[0][xi];
+
+                    bool horizontal_first_edge = (tri[0][yi] == tri[1][yi]);
+                    if (horizontal_first_edge) {
+                        edges[1].dx = dx[2];
+                        edges[1].x  = tri[1][xi];
+                    }
+                    else {
+                        edges[1].dx = dx[1];
+                        edges[1].x  = tri[0][xi];
                     }
 
-                    // printf("y=%f\n", y);
+                    u8 le = (tri[0][xi] + edges[0].dx * (tri[1][yi] - tri[0][yi]) < tri[1][xi] ? 0 : 1);
+                    u8 re = (le == 0 ? 1 : 0);
 
-                    for (f64 x = std::floor(std::min(edges[0].x, edges[1].x));
-                         x <= std::max(edges[0].x, edges[1].x);
-                         // TODO: change x += 1.0f to dx
-                         x += 1.0f) {
-                        // printf("\tx=%f\n", x);
-                        vec3 p;
-                        p[xi]       = x;
-                        p[yi]       = y;
-                        const f64 a = tri_normal[xi], b = tri_normal[yi], c = tri_normal[zi];
-                        const f64 d = -dot(tri_normal, tri[0]);
-                        p[zi]       = (-1.0f / c) * (a * x + b * y + d);
-                        if (p[zi] >= 0.0) {
-                            bool new_voxel =
-                                write_voxel(grid, data, grid_size, p, type, tri_it, flood_fill);
-                            if (new_voxel) voxel_count++;
+                    vec3 curr;
+                    curr[zi] = dzdx * edges[le].x + dzdy * tri[0][yi] + w;
+
+                    for (curr[yi] = tri[0][yi]; curr[yi] <= tri[2][yi];) {
+                        if (curr[yi] >= tri[1][yi] && curr[yi] - 1.0 < tri[1][yi]) {
+                            edges[1].dx = dx[2];
+                            edges[1].x  = tri[1][xi] + (curr[yi] - tri[1][yi]) * edges[1].dx;
+                            curr[zi]    = dzdx * edges[le].x + dzdy * curr[yi] + w;
+                            // printf("next edge: dx: %F, x: %F\n", edges[1].dx, edges[1].x);
                         }
-                        // printf("\t\tp=%s\n", p.to_string().c_str());
-                        // for (int i = 0; i < 3; i++) {
-                        // printf("\t\tfor i=%d: p[%d]=%f (not floored: %f)\n", i, i, p[i],
-                        // (-1.0f / tri_normal[zi]) * (tri_normal[xi] * x + tri_normal[yi] * y +
-                        // -dot(tri_normal, tri[0])));
-                        // fflush(stdout);
-                        // }
+                        // printf("curr[yi]: %F\n", curr[yi]);
+                        f64 start_z = curr[zi];
+                        for (curr[xi] = edges[le].x; curr[xi] <= edges[re].x;
+                             curr[xi] += 1.0, curr[zi] += dzdx) {
+                            // printf("\tcurr[xi]: %F\t", curr[xi]);
+
+                            // f64 z = dzdx * curr[xi] + dzdy * curr[yi] + w;
+                            // printf("curr[zi]:   %F,       z: %F\n", curr[zi], z);
+                            // if (curr[zi] - z > epsilon) printf("\tWarning: curr[zi] != z\n");
+                            // fflush(stdout);
+                            if (curr[zi] < 0.0) continue;
+
+                            bool new_voxel =
+                                write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                            if (new_voxel) (*voxel_count)++;
+                        }
+
+                        curr[zi] -= dzdx * (curr[xi] - edges[re].x);
+                        curr[xi] = edges[re].x;
+                        assert(abs(curr[zi] - (dzdx * curr[xi] + dzdy * curr[yi] + w)) < epsilon);
+                        if (curr[zi] >= 0.0) {
+                            bool new_voxel =
+                                write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                            if (new_voxel) (*voxel_count)++;
+                        }
+
+                        for (auto& e : edges) e.x += e.dx;
+                        curr[yi] += 1.0;
+                        curr[zi] = start_z + edges[le].dx * dzdx + dzdy;
                     }
 
-                    for (auto& e : edges) e.x += e.dx / y_presition;
+                    curr = tri[1];
+                    bool new_voxel =
+                        write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                    if (new_voxel) (*voxel_count)++;
+                    curr      = tri[2];
+                    new_voxel = write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                    if (new_voxel) (*voxel_count)++;
                 }
             }
         }
-        /*} else if (true) {
-        for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
-            for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
-                Triangle& tri = *(Triangle*)(&meshes[mesh_it][tri_it]);
 
-                vec3 tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
-                VoxelMeta type;
-                if (std::abs(tri_normal.z) < epsilon)
-                    type = VoxelMeta::BOTH;
-                else if (tri_normal.z < 0.0f)
-                    type = VoxelMeta::OPENING;
-                else if (tri_normal.z > 0.0f)
-                    type = VoxelMeta::CLOSING;
-
-                const f64* dominant_axis =
-                    std::max_element(tri_normal.begin(), tri_normal.end(),
-                                     [](f64 lhs, f64 rhs) { return abs(lhs) < abs(rhs); });
-                i32 dominant_axis_idx = dominant_axis - &tri_normal.x;
-
-                for (auto& v : tri) v = swizzle(v, (dominant_axis_idx + 1) % 3);
-                tri_normal = swizzle(tri_normal, (dominant_axis_idx + 1) % 3);
-
-                std::sort(tri.begin(), tri.end(),
-                          [](const vec3& lhs, const vec3& rhs) { return lhs.y < rhs.y; });
-
-                // assume scanline: edge[0] -> edge[1]
-                // assert(tri[0].y < tri[2].y);
-                // assert(tri[0].x != tri[1].x || tri[1].x != tri[2].x || tri[0].x != tri[2].x);
-                // const auto signed_dist = signed_edge_function(tri[0], tri[2], true, tri[1]);
-                // if (signed_dist == 0.0f) continue; // FIXME? add a warning
-                // const f64 dx = signed_dist > 0.0f ? -1.0f : 1.0f;
-
-                struct Edge {
-                    f64 x;
-                    f64 dx;
-                } edges[2];
-
-                constexpr f64 y_presition = 2.0f;
-                edges[0].dx = (tri[2].x - tri[0].x) / (tri[2].y - tri[0].y);
-                edges[0].x = tri[0].x;
-
-                // traverse only
-                bool horizontal_first_edge = (tri[0].y == tri[1].y);
-                if (horizontal_first_edge) {
-                    edges[1].dx = (tri[2].x - tri[1].x) / (tri[2].y - tri[1].y);
-                    edges[1].x = tri[1].x;
-                } else {
-                    edges[1].dx = (tri[1].x - tri[0].x) / (tri[1].y - tri[0].y);
-                    edges[1].x = tri[0].x;
-                }
-
-                for (f64 y = tri[0].y; y <= tri[2].y; y += 1.0f / y_presition) {
-                    if (!horizontal_first_edge && y >= tri[1].y && y - 1.0f < tri[1].y) {
-                        edges[1].dx = (tri[2].x - tri[1].x) / (tri[2].y - tri[1].y);
-                        edges[1].x = tri[1].x + (y - tri[1].y) * edges[1].dx;
-                    }
-
-                    f64 grid_x = swizzle(grid_size, (dominant_axis_idx + 1) % 3)[0];
-                    for (f64 x = progressive_floor(std::min(edges[0].x, edges[1].x));
-                         x <= progressive_ceil(std::max(edges[0].x, edges[1].x), grid_x - 1);
-                         x += 1.0f) {
-                        // TODO: change x += 1.0f to dx
-                        const f64 a = tri_normal.x, b = tri_normal.y, c = tri_normal.z;
-                        const f64 d = -dot(tri_normal, tri[0]);
-                        f64 z = std::floor((-1.0f / c) * (a * x + b * y + d));
-                        if (z < 0.0) continue;
-
-                        vec3 point;
-                        point = swizzle(vec3(x, y, z), 2 - dominant_axis_idx);
-                        size_t voxel_num = std::floor(point.x) * grid_size[1] * grid_size[2] +
-                                           std::floor(point.y) * grid_size[2] + std::floor(point.z);
-
-                        if (!flood_fill) {
-                            if (!get_voxel(grid, voxel_num)) {
-                                voxel_count++;
-                                set_voxel(grid, voxel_num);
-                            }
-                        } else {
-                            Voxel2* voxel = &((Voxel2*)grid)[voxel_num];
-                            if (!get_voxel<Voxel2>((Voxel2*)grid, voxel_num)) {
-                                set_voxel<Voxel2>((Voxel2*)grid, voxel_num);
-                                voxel->type = type;
-                                voxel_count++;
-                            } else if (voxel->type != type && voxel->type != VoxelMeta::CROUDED &&
-                                       (type == VoxelMeta::BOTH || voxel->type == VoxelMeta::BOTH)) {
-                                voxel->type = VoxelMeta::CROUDED;
-                            }
-
-                            if (data) types[voxel_num] = voxel->type;
-                        }
-                    }
-
-                    for (auto& e : edges) e.x += e.dx / y_presition;
-                }
-            }
-        }*/
-    } else {
-        assert(flood_fill || data);
-        Voxel_* grid_ = (Voxel_*)calloc(grid_size[0] * grid_size[1] * grid_size[2], sizeof(Voxel_));
-
+        if (flood_fill) (*voxel_count) = flood_fill_rast(grid, (VoxelType*)data, grid_size);
+    }
+    else {
         for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
             for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
                 Triangle& tri = *(Triangle*)(&meshes[mesh_it][tri_it]);
@@ -435,52 +340,54 @@ Voxelizer::voxelize(unsigned char grid[],
                 array<i32, 3> aligned_min, aligned_max;
                 for (int i = 0; i < 3; i++) {
                     aligned_min[i] = static_cast<i32>(progressive_floor(tmin[i]));
-                    aligned_max[i] = static_cast<i32>(std::floor(tmax[i]));
+                    aligned_max[i] = static_cast<i32>(floor(tmax[i]));
                 }
 
                 vec3 tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
                 vec3 edges[3];
                 for (int i = 0; i < 3; i++) edges[i] = tri[(i + 1) % 3] - tri[i];
 
-                Voxel_::Type type;
+                VoxelData::Type type;
                 if (std::abs(tri_normal.z) < epsilon)
-                    type = Voxel_::BOTH;
-                else if (tri_normal.z < 0.0f)
-                    type = Voxel_::OPENING;
-                else if (tri_normal.z > 0.0f)
-                    type = Voxel_::CLOSING;
+                    type = VoxelData::BOTH;
+                else if (tri_normal.z < 0.0)
+                    type = VoxelData::OPENING;
+                else if (tri_normal.z > 0.0)
+                    type = VoxelData::CLOSING;
 
                 for (i32 z = aligned_min[0]; z <= aligned_max[0]; z++) {
                     for (i32 x = aligned_min[1]; x <= aligned_max[1]; x++) {
                         for (i32 y = aligned_min[2]; y <= aligned_max[2]; y++) {
                             auto           at = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
                             vec3           min_voxel = vec3(z, x, y);
-                            array<vec3, 2> aabb      = { min_voxel, min_voxel + 1.0f };
+                            array<vec3, 2> aabb      = { min_voxel, min_voxel + 1.0 };
 
                             bool is_coll = triangle_aabb_collision_mt(tri, tri_normal, edges, aabb);
                             if (is_coll) {
-                                Voxel_* voxel = (Voxel_*)&grid_[at];
-                                if (!voxel->valid) {
-                                    voxel_count++;
-                                    voxel->valid = true;
+                                if (!get_voxel(grid, at)) {
+                                    set_voxel(grid, at, true);
+                                    (*voxel_count)++;
                                 }
 
+                                if (!flood_fill && !data) continue;
                                 auto colls = find_triangle_aabb_collision(tri, edges, aabb);
-                                // if (colls.empty()) continue; // the triangle is inside
-                                // the aabb
+                                // if (colls.empty()) continue; // the triangle is inside the aabb
                                 if (colls.empty()) colls.insert(colls.end(), tri.cbegin(), tri.cend());
 
-                                auto max_coll = *std::max_element(colls.cbegin(), colls.cend(),
-                                                                  [](const vec3& l, const vec3& r) {
-                                                                      return l.z < r.z;
-                                                                  });
+                                vec3 max_coll //
+                                    = *std::max_element(colls.cbegin(), colls.cend(),
+                                                        [](const vec3& l, const vec3& r) {
+                                                            // return l[0] < r[0]; FIXME
+                                                            return l.z < r.z;
+                                                        });
 
+                                VoxelData* voxel = &((VoxelData*)data)[at];
                                 // update only max offset collision
                                 if (max_coll.z + epsilon < voxel->max_coll_off) continue;
 
                                 // new voxel or prev collision is less than current max
                                 // collision is updated
-                                if (voxel->max_type == Voxel_::NONE ||
+                                if (voxel->max_type == VoxelData::NONE ||
                                     max_coll.z > voxel->max_coll_off) {
                                     voxel->max_type     = type;
                                     voxel->max_coll_off = max_coll.z;
@@ -488,14 +395,13 @@ Voxelizer::voxelize(unsigned char grid[],
                                 // collision points are equal, favor? closing triangles
                                 // FIXME: add left-of / right-of collision type to decide
                                 // which collision to favor
-                                else if (type == Voxel_::CLOSING) {
+                                else if (type == VoxelData::CLOSING) {
                                     voxel->max_type     = type;
                                     voxel->max_coll_off = max_coll.z;
                                 }
-
                                 /*
                                    else if (max_coll.z == voxel->max_coll_off &&
-                                   max_coll.z == aabb[1].z) { if (type == Voxel_::CLOSING)
+                                   max_coll.z == aabb[1].z) { if (type == VoxelData::CLOSING)
                                    { voxel->max_type = type; voxel->max_coll_off =
                                    max_coll.z; }
                                    }
@@ -507,22 +413,21 @@ Voxelizer::voxelize(unsigned char grid[],
             }
         }
 
-        assert(data);
-        for (int i = 0; i < grid_size[0] * grid_size[1] * grid_size[2]; i++) {
-            if (grid_[i].valid) {
-                set_voxel(grid, i, true);
-                switch (grid_[i].max_type) {
-                case Voxel_::CLOSING: data[i].type = VoxelMeta::CLOSING; break;
-                case Voxel_::OPENING: data[i].type = VoxelMeta::OPENING; break;
-                case Voxel_::BOTH: data[i].type = VoxelMeta::BOTH; break;
-                default: break;
-                }
-            }
-        }
-        free(grid_);
+        if (flood_fill)
+            return flood_fill_rast_collision_detection(grid, (VoxelData*)data, grid_size, voxel_count);
     }
 
-    if (flood_fill) voxel_count = flood_fill_rast2(grid, data, grid_size);
+    return SUCCESS;
+}
 
-    return voxel_count;
+size_t
+Voxelizer::size_of_voxel_type_with_collision()
+{
+    return sizeof(VoxelData);
+}
+
+size_t
+Voxelizer::size_of_voxel_type()
+{
+    return sizeof(VoxelType);
 }

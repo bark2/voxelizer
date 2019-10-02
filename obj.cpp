@@ -127,11 +127,12 @@ enum Type { CROUDED, CLOSING, OPENING, BOTH };
 
 // little indian
 int
-export_magicavoxel(const char*          filename,
-                   const unsigned char  grid[],
-                   array<int, 3>        grid_size,
-                   int                  voxels_n,
-                   Voxelizer::VoxelMeta data[])
+export_magicavoxel(const char*         filename,
+                   const unsigned char grid[],
+                   array<int, 3>       grid_size,
+                   unsigned int        voxels_n,
+                   bool                use_collision_detection,
+                   unsigned char       data[])
 {
     FILE* out = fopen(filename, "wb");
     if (!out) return 1;
@@ -176,14 +177,30 @@ export_magicavoxel(const char*          filename,
                         for (unsigned char j = 0; j < scaling[1]; j++)
                             for (unsigned char k = 0; k < scaling[2]; k++) {
                                 unsigned char color = 1;
-                                if (data) {
-                                    auto type = data[voxel_num].type;
+                                if (data && !use_collision_detection) {
+                                    Voxelizer::VoxelType type = ((Voxelizer::VoxelType*)data)[voxel_num];
                                     switch (type) {
-                                    case Voxelizer::VoxelMeta::OPENING: color = 122; break;
-                                    case Voxelizer::VoxelMeta::CLOSING: color = 218; break;
-                                    case Voxelizer::VoxelMeta::CROUDED: color = 7 << 5; break;
+                                    case Voxelizer::VoxelType::OPENING: color = 122; break;
+                                    case Voxelizer::VoxelType::CLOSING: color = 218; break;
+                                    case Voxelizer::VoxelType::CROUDED: color = 7 << 5; break;
                                     default: break;
                                     }
+                                }
+                                if (data && use_collision_detection) {
+                                    // unsigned type =
+                                    // *(data +
+                                    // (voxel_num * Voxelizer::size_of_voxel_type_with_collision()) +
+                                    // sizeof(double));
+                                    IVoxelizer::VoxelData::Type type =
+                                        ((IVoxelizer::VoxelData*)data)[voxel_num].max_type;
+                                    if (type == 0)
+                                        color = 1;
+                                    else if (type == 1)
+                                        color = 218;
+                                    else if (type == 2)
+                                        color = 122;
+                                    else if (type == 3)
+                                        color = 7 << 5;
                                 }
                                 unsigned int position_color = ((x * scaling[0] + i) << 24) +
                                                               ((y * scaling[1] + j) << 16) +
@@ -197,7 +214,7 @@ export_magicavoxel(const char*          filename,
     fwrite(buffer.data(), sizeof(unsigned int), buffer.size(), out);
     fclose(out);
 
-    assert(static_cast<int>(output_voxels) == voxels_n * scaling[0] * scaling[1] * scaling[2]);
+    assert(output_voxels == voxels_n * scaling[0] * scaling[1] * scaling[2]);
     return 0;
 }
 

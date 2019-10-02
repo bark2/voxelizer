@@ -18,11 +18,11 @@ print_usage()
         "Usage: vox --in file --grid z,x,y [--flood-fill] [--flip-normals] [--magicavoxel --include-normals]\n");
 }
 
-float scene_aabb_min[3] = { std::numeric_limits<float>::max(), std::numeric_limits<float>::max(),
-                            std::numeric_limits<float>::max() };
-float scene_aabb_max[3] = { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(),
-                            -std::numeric_limits<float>::max() };
-using Triangle          = float[3][3];
+double scene_aabb_min[3] = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max(),
+                             std::numeric_limits<double>::max() };
+double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
+                             -std::numeric_limits<double>::max() };
+using Triangle           = double[3][3];
 std::vector<Triangle> triangles;
 
 int
@@ -82,6 +82,9 @@ main(int argc, char* argv[])
     bool flip_normals = false;
     if (get_cmd(argv, argv + argc, "--flip-normals")) flip_normals = true;
 
+    bool use_collision_detection = false;
+    if (get_cmd(argv, argv + argc, "--use-collision-detection")) use_collision_detection = true;
+
     enum class FORMAT { RAW, MAGICAVOXEL } do_export = FORMAT::RAW;
     char** arg_format                                = get_cmd(argv, argv + argc, "--magicavoxel");
     if (arg_format) do_export = FORMAT::MAGICAVOXEL;
@@ -91,29 +94,32 @@ main(int argc, char* argv[])
             printf("Error: irit parser\n");
             return 1;
         }
-    } else {
+    }
+    else {
         load_file(filename);
     }
 
-    float(*meshes[])[3][3] = { (float(*)[3][3])triangles.data() };
-    size_t triangle_count  = triangles.size();
+    double(*meshes[])[3][3] = { (double(*)[3][3])triangles.data() };
+    size_t triangle_count   = triangles.size();
 
     unsigned char* grid = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2] / 8, 1);
-    if (!grid) { return 1; }
+    if (!grid) return 1;
 
-    Voxelizer::VoxelMeta* data =
-        (Voxelizer::VoxelMeta*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
-                                      sizeof(Voxelizer::VoxelMeta));
-    int voxel_count = Voxelizer::voxelize(grid, grid_size[0], grid_size[1], grid_size[2], meshes,
-                                          &triangle_count, 1, flip_normals, (float*)&scene_aabb_min,
-                                          (float*)&scene_aabb_max, flood_fill, data);
+    // unsigned char* data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
+    // Voxelizer::size_of_voxel_type());
+    unsigned char* data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
+                                                 Voxelizer::size_of_voxel_type_with_collision());
+    unsigned int   voxel_count;
+    char err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2], meshes,
+                                   &triangle_count, 1, flip_normals, (double*)&scene_aabb_min,
+                                   (double*)&scene_aabb_max, flood_fill, use_collision_detection, data);
 
-    if (do_export == FORMAT::RAW) {
-        export_raw(grid, grid_size);
-    } else {
+    if (do_export == FORMAT::RAW) { export_raw(grid, grid_size); }
+    else {
         printf("voxels:\t%u\n", voxel_count);
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));
-        if (export_magicavoxel(out_filename, grid, grid_size, voxel_count, data))
+        if (export_magicavoxel(out_filename, grid, grid_size, voxel_count, use_collision_detection,
+                               data))
             assert(0 && "couldn't not open the vox file");
     }
 

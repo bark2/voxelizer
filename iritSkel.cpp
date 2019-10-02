@@ -116,8 +116,8 @@ CGSkelStoreData(IPObjectStruct* PObj)
 {
     using IVoxelizer::Triangle;
 
-    extern float scene_aabb_min[3];
-    extern float scene_aabb_max[3];
+    extern double scene_aabb_min[3];
+    extern double scene_aabb_max[3];
     extern std::vector<Triangle> triangles;
     int i;
     const char* Str;
@@ -164,7 +164,7 @@ CGSkelStoreData(IPObjectStruct* PObj)
         PVertex = PPolygon->PVertex;
         do {
             for (int j = 0; j < 3; j++) {
-                float x = PVertex->Coord[j];
+                double x = PVertex->Coord[j];
                 scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
                 scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
                 if (vi < 3)
