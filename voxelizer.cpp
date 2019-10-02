@@ -183,11 +183,12 @@ Voxelizer::voxelize(unsigned char grid[],
             if (flip_normals) std::swap(tri[1], tri[2]);
             for (auto& v : tri) {
                 // saves the headache of finding the grid voxel for each point
+                // v = { v.z, v.x, v.y };
                 for (i32 i = 0; i < 3; i++) {
                     // normalize to[0.0, grid_size - 1.0]
-                    v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) / normilization_factor;
+                    v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) /
+                           (triangles_max_max - triangles_min_min);
                 }
-                v = { v.z, v.x, v.y };
             }
         }
     }
