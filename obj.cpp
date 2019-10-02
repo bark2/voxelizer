@@ -15,77 +15,8 @@
 #include <string>
 #include <vector>
 
-// #ifdef AI
-#include <assimp/Importer.hpp>
-#include <assimp/postprocess.h>
-#include <assimp/scene.h>
-
 using std::array;
 using Triangle = array<array<double, 3>, 3>;
-
-void
-processMesh(aiMesh* mesh)
-{
-    extern double                scene_aabb_min[3];
-    extern double                scene_aabb_max[3];
-    extern std::vector<Triangle> triangles;
-
-    for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
-        aiFace face = mesh->mFaces[i];
-        assert(face.mNumIndices == 3);
-
-        Triangle t;
-        for (int j = 0; j < 3; j++) {
-            for (int k = 0; k < 3; k++) {
-                t[j][k]           = mesh->mVertices[face.mIndices[j]][k];
-                scene_aabb_min[k] = std::min(scene_aabb_min[k], t[j][k]);
-                scene_aabb_max[k] = std::max(scene_aabb_max[k], t[j][k]);
-            }
-        }
-
-        triangles.push_back(t);
-    }
-}
-
-void
-processNode(aiNode* node, const aiScene* scene)
-{
-    for (unsigned int i = 0; i < node->mNumMeshes; i++) {
-        aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        processMesh(mesh);
-    }
-
-    for (unsigned int i = 0; i < node->mNumChildren; i++) processNode(node->mChildren[i], scene);
-}
-
-void
-ai_load_file(const std::string& filename)
-{
-    Assimp::Importer importer;
-    const aiScene*   scene = importer.ReadFile(filename, aiProcess_Triangulate);
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-        printf("ERROR::ASSIMP::%s", importer.GetErrorString());
-        return;
-    }
-
-    processNode(scene->mRootNode, scene);
-}
-
-//#endif
-
-static const unsigned int max_line = 128;
-
-enum Command { POSITION = 0, TEXTURE, NORMAL, FACE, GROUP, OBJECT, SMOOTH, COMMENT, COMMANDS_COUNT };
-
-static const std::array<const std::string, COMMANDS_COUNT> commands_map { "v ", "vt ", "vn ", "f ",
-                                                                          "g ", "o ",  "s ",  "#" };
-
-void
-load_file(const std::string& filename)
-{
-    ai_load_file(filename);
-    return;
-}
 
 // 2. Chunk Structure
 // -------------------------------------------------------------------------------
@@ -137,10 +68,11 @@ export_magicavoxel(const char*         filename,
     FILE* out = fopen(filename, "wb");
     if (!out) return 1;
 
-    unsigned int  meta_size     = 3 * sizeof(unsigned int);
-    unsigned int  size_size     = 3 * sizeof(unsigned int);
-    int           max_grid_size = std::max({ grid_size[0], grid_size[1], grid_size[2] });
-    array<int, 3> scaling       = { max_grid_size / grid_size[0], max_grid_size / grid_size[1],
+    unsigned int meta_size     = 3 * sizeof(unsigned int);
+    unsigned int size_size     = 3 * sizeof(unsigned int);
+    int          max_grid_size = std::max({ grid_size[0], grid_size[1], grid_size[2] });
+    grid_size                  = { grid_size[2], grid_size[0], grid_size[1] };
+    array<int, 3> scaling      = { max_grid_size / grid_size[0], max_grid_size / grid_size[1],
                               max_grid_size / grid_size[2] };
     voxels_n *= scaling[0] * scaling[1] * scaling[2];
     unsigned int xyzi_size          = (voxels_n + 1) * sizeof(unsigned int);
@@ -187,10 +119,6 @@ export_magicavoxel(const char*         filename,
                                     }
                                 }
                                 if (data && use_collision_detection) {
-                                    // unsigned type =
-                                    // *(data +
-                                    // (voxel_num * Voxelizer::size_of_voxel_type_with_collision()) +
-                                    // sizeof(double));
                                     IVoxelizer::VoxelData::Type type =
                                         ((IVoxelizer::VoxelData*)data)[voxel_num].max_type;
                                     if (type == 0)
@@ -214,7 +142,7 @@ export_magicavoxel(const char*         filename,
     fwrite(buffer.data(), sizeof(unsigned int), buffer.size(), out);
     fclose(out);
 
-    assert(output_voxels == voxels_n * scaling[0] * scaling[1] * scaling[2]);
+    assert(output_voxels == voxels_n);
     return 0;
 }
 

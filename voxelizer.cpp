@@ -128,7 +128,6 @@ write_voxel(u8                   grid[],
             (ctype == Voxelizer::VoxelType::CLOSING && type == Voxelizer::VoxelType::OPENING))
             data[voxel_num] = Voxelizer::VoxelType::CROUDED;
     }
-
     return new_voxel;
 }
 
@@ -168,10 +167,11 @@ Voxelizer::voxelize(unsigned char grid[],
                     }
     }
 
-    array<i32, 3> grid_size         = { grid_size_z, grid_size_x, grid_size_y };
-    f64           triangles_min_min = std::min({ triangles_min[0], triangles_min[1], triangles_min[2] });
-    f64           triangles_max_max = std::max({ triangles_max[0], triangles_max[1], triangles_max[2] });
-    f64           normilization_factor =
+    array<i32, 3> grid_size = { grid_size_z, grid_size_x, grid_size_y };
+    printf("grid size %d %d %d\n", grid_size[0], grid_size[1], grid_size[2]);
+    f64 triangles_min_min = std::min({ triangles_min[0], triangles_min[1], triangles_min[2] });
+    f64 triangles_max_max = std::max({ triangles_max[0], triangles_max[1], triangles_max[2] });
+    f64 normilization_factor =
         std::max({ triangles_max[0] - triangles_min[0], triangles_max[1] - triangles_min[1],
                    triangles_max[2] - triangles_min[2] });
 
@@ -183,19 +183,11 @@ Voxelizer::voxelize(unsigned char grid[],
             if (flip_normals) std::swap(tri[1], tri[2]);
             for (auto& v : tri) {
                 // saves the headache of finding the grid voxel for each point
-                // for (i32 i = 0; i < 3; i++) {
-                // normalize to[0.0, grid_size - 1.0]
-                // v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) / normilization_factor;
-                // }
-                // v = { v.z, v.x, v.y };
-
-                v = { v.z, v.x, v.y };
-                // saves the headache of finding the grid voxel for each point
                 for (i32 i = 0; i < 3; i++) {
-                    // normalize to[0.0f, grid_size - 1.0f]
-                    v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) /
-                           (triangles_max_max - triangles_min_min);
+                    // normalize to[0.0, grid_size - 1.0]
+                    v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) / normilization_factor;
                 }
+                v = { v.z, v.x, v.y };
             }
         }
     }

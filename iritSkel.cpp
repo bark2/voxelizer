@@ -114,7 +114,7 @@ CGSkelDumpOneTraversedObject(IPObjectStruct* PObj, IrtHmgnMatType Mat, void* Dat
 bool
 CGSkelStoreData(IPObjectStruct* PObj)
 {
-    using IVoxelizer::Triangle;
+    using Triangle = std::array<std::array<double, 3>, 3>;
 
     extern double scene_aabb_min[3];
     extern double scene_aabb_max[3];

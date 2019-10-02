@@ -22,7 +22,7 @@ double scene_aabb_min[3] = { std::numeric_limits<double>::max(), std::numeric_li
                              std::numeric_limits<double>::max() };
 double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
                              -std::numeric_limits<double>::max() };
-using Triangle           = double[3][3];
+using Triangle           = std::array<std::array<double, 3>, 3>;
 std::vector<Triangle> triangles;
 
 int
@@ -38,12 +38,10 @@ main(int argc, char* argv[])
         return 1;
     }
     sscanf(arg_input_file[1], "%s", filename);
-#ifndef AI
-    if (strstr(filename, ".obj") && strstr(filename, ".itd")) {
+    if (!strstr(filename, ".itd")) {
         printf("Input Error: file extention isnt supported\n");
         return 1;
     }
-#endif
     assert(strlen(filename) < IRIT_LINE_LEN_VLONG - 5);
 
     char   out_filename[128] = {};
@@ -68,7 +66,7 @@ main(int argc, char* argv[])
         print_usage();
         return 1;
     }
-    sscanf(arg_resolution[1], "%d,%d,%d", &grid_size[2], &grid_size[0], &grid_size[1]);
+    sscanf(arg_resolution[1], "%d,%d,%d", &grid_size[0], &grid_size[1], &grid_size[2]);
 
     bool include_normals = false;
     if (get_cmd(argv, argv + argc, "--include-normals")) include_normals = true;
@@ -89,14 +87,9 @@ main(int argc, char* argv[])
     char** arg_format                                = get_cmd(argv, argv + argc, "--magicavoxel");
     if (arg_format) do_export = FORMAT::MAGICAVOXEL;
 
-    if (strstr(filename, ".itd")) {
-        if (!CGSkelProcessIritDataFiles((const char*)filename)) {
-            printf("Error: irit parser\n");
-            return 1;
-        }
-    }
-    else {
-        load_file(filename);
+    if (!CGSkelProcessIritDataFiles((const char*)filename)) {
+        printf("Error: irit parser\n");
+        return 1;
     }
 
     double(*meshes[])[3][3] = { (double(*)[3][3])triangles.data() };
@@ -105,11 +98,17 @@ main(int argc, char* argv[])
     unsigned char* grid = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2] / 8, 1);
     if (!grid) return 1;
 
-    // unsigned char* data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
-    // Voxelizer::size_of_voxel_type());
-    unsigned char* data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
-                                                 Voxelizer::size_of_voxel_type_with_collision());
-    unsigned int   voxel_count;
+    unsigned char* data = nullptr;
+    if (!use_collision_detection) {
+        data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
+                                      Voxelizer::size_of_voxel_type());
+    }
+    else {
+        data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
+                                      Voxelizer::size_of_voxel_type_with_collision());
+    }
+
+    unsigned int voxel_count;
     char err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2], meshes,
                                    &triangle_count, 1, flip_normals, (double*)&scene_aabb_min,
                                    (double*)&scene_aabb_max, flood_fill, use_collision_detection, data);
