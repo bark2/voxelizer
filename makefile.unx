@@ -1,5 +1,4 @@
 IRIT_DIR = ./irit-sm
-
 include $(IRIT_DIR)/makeflag.unx
 
 CC         = g++
@@ -8,10 +7,10 @@ OBJECTS = common.o iritSkel.o obj.o voxelizer.o
 HEADERS = $(wildcard *.h)
 
 voxelizer: $(OBJECTS) $(HEADERS) makefile.unx main.o
-	$(CC) $(CFLAGS) $(IRIT_LIBS) -lm -o vox $(OBJECTS) main.o
+	$(CC) $(CFLAGS) -o voxelizer  $(IRIT_LIBS) $(OBJECTS) main.o
 
 clean:
-	rm -f *.o vox *.a
+	rm -f *.o *.a voxelizer
 
 %.o: %.cpp $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@

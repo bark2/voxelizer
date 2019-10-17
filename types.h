@@ -1,6 +1,5 @@
 #pragma once
 
-#include "csignal"
 #include <array>
 #include <cassert>
 #include <cstdint>
