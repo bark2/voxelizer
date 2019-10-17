@@ -1,0 +1,5 @@
+compilerflags= /I".\include" /O2 /Zi /EHsc
+linkerflags= /OUT:".\voxelizer.exe" /MACHINE:X86 /SUBSYSTEM:CONSOLE /ERRORREPORT:PROMPT /NOLOGO /DYNAMICBASE "irit.lib"
+
+voxelizer:
+        cl.exe %compilerflags% voxelizer.cpp common.cpp iritSkel.cpp main.cpp obj.cpp /link %linkerflags%
