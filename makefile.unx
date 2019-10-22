@@ -2,7 +2,7 @@ IRIT_DIR = ./irit-sm
 include $(IRIT_DIR)/makeflag.unx
 
 CC         = g++
-CFLAGS = -Wc++11-compat -Wextra -std=c++11 -O2
+CFLAGS = -Wc++11-compat -Wextra -std=c++11 -O0 -g
 OBJECTS = common.o iritSkel.o obj.o voxelizer.o
 HEADERS = $(wildcard *.h)
 

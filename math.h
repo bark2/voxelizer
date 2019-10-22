@@ -46,6 +46,14 @@ is_rat(f64 x)
 }
 
 inline f64
+signed_edge_function(const vec2& v0, const vec2& v1, const vec2& test_point)
+{
+    vec2 edge        = v1 - v0;
+    vec2 edge_normal = vec2(-edge.y, edge.x);
+    return dot(edge_normal, test_point - ((v0 + v1) / 2.0));
+}
+
+inline f64
 signed_edge_function(const vec2& v0, const vec2& v1, bool back_facing, const vec2& test_point)
 {
     f64  d           = back_facing ? 1.0 : -1.0;
@@ -256,7 +264,8 @@ line_triangle_intersection(const array<vec3, 2>& line, const Triangle& triangle)
         p            = lerp(line, plane_coll.second);
         auto bary    = get_barycentrics(triangle, p);
         intersecting = std::all_of(bary.begin(), bary.end(), is_rat);
-    } else { // the line lies on t's plane, taking both intersections with tri
+    }
+    else { // the line lies on t's plane, taking both intersections with tri
         vec3 bary_l0           = get_barycentrics(triangle, line[0]);
         vec3 bary_l1           = get_barycentrics(triangle, line[1]);
         bool is_l0_in_triangle = std::all_of(bary_l0.begin(), bary_l0.end(), is_rat);
@@ -264,7 +273,8 @@ line_triangle_intersection(const array<vec3, 2>& line, const Triangle& triangle)
         if (is_l0_in_triangle && is_l1_in_triangle) {
             intersecting = true;
             p            = (line[0].z < line[1].z ? line[1] : line[0]);
-        } else {
+        }
+        else {
             // p = l0 + t * (l1-l0) => t = l0 / (l0 - l1) in the triangle's edges
             vec3           t             = bary_l0 / (bary_l0 - bary_l1);
             array<vec3, 2> intersections = {};
@@ -302,9 +312,8 @@ line_triangle_intersection_fast(const array<vec3, 2>& line,
 {
     f64  line_length = (line[1] - line[0]).length();
     auto coll        = line_triangle_intersection_mt(line, line_length, triangle, edges);
-    if (!coll.first) {
-        return { false, {} };
-    } else if (coll.second != 1.0) {
+    if (!coll.first) { return { false, {} }; }
+    else if (coll.second != 1.0) {
         if (coll.second < 0.0 || coll.second > line_length) return { false, {} };
         return { true, lerp(line, coll.second) };
     }

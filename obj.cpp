@@ -147,12 +147,12 @@ export_magicavoxel(const char*         filename,
 }
 
 int
-export_raw(const unsigned char grid[], array<int, 3> grid_size)
+export_raw(const unsigned char grid[], array<int, 3> grid_size, FILE* out)
 {
-    for (int z = 0; z < grid_size[0]; z++)
-        for (int x = 0; x < grid_size[1]; x++)
-            for (int y = 0; y < grid_size[2]; y++) {
-                unsigned int         at = (z * grid_size[1] * grid_size[2] + x * grid_size[2] + y);
+    for (int x = 0; x < grid_size[0]; x++)
+        for (int y = 0; y < grid_size[1]; y++)
+            for (int z = 0; z < grid_size[2]; z++) {
+                unsigned int         at = (x * grid_size[1] * grid_size[2] + y * grid_size[2] + z);
                 bool                 is_valid;
                 const unsigned char* voxels     = &grid[at / 8];
                 unsigned char        bit_number = at % 8;
@@ -160,9 +160,9 @@ export_raw(const unsigned char grid[], array<int, 3> grid_size)
                 is_valid                        = *voxels & mask;
 
                 if (is_valid)
-                    puts("1");
+                    fputc('1', out);
                 else
-                    puts("0");
+                    fputc('0', out);
             }
     return 0;
 }

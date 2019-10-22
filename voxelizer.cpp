@@ -151,8 +151,8 @@ Voxelizer::voxelize(unsigned char grid[],
     if (use_collision_detection && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
 
     if (!triangles_min || !triangles_max) {
-        triangles_min = (double*)malloc(sizeof(triangles_min[0]) * 3);
-        triangles_max = (double*)malloc(sizeof(triangles_max[0]) * 3);
+        triangles_min = (f64*)malloc(sizeof(triangles_min[0]) * 3);
+        triangles_max = (f64*)malloc(sizeof(triangles_max[0]) * 3);
         for (int i = 0; i < 3; i++) {
             triangles_min[i] = std::numeric_limits<f64>::max();
             triangles_max[i] = -std::numeric_limits<f64>::max();
@@ -167,27 +167,21 @@ Voxelizer::voxelize(unsigned char grid[],
                     }
     }
 
-    array<i32, 3> grid_size = { grid_size_z, grid_size_x, grid_size_y };
-    printf("grid size %d %d %d\n", grid_size[0], grid_size[1], grid_size[2]);
-    f64 triangles_min_min = std::min({ triangles_min[0], triangles_min[1], triangles_min[2] });
-    f64 triangles_max_max = std::max({ triangles_max[0], triangles_max[1], triangles_max[2] });
-    f64 normilization_factor =
-        std::max({ triangles_max[0] - triangles_min[0], triangles_max[1] - triangles_min[1],
-                   triangles_max[2] - triangles_min[2] });
+    array<i32, 3> grid_size         = { grid_size_z, grid_size_x, grid_size_y };
+    f64           triangles_min_min = std::min({ triangles_min[0], triangles_min[1], triangles_min[2] });
+    f64           triangles_max_max = std::max({ triangles_max[0], triangles_max[1], triangles_max[2] });
 
     // normalize triangles
     for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
         for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
             Triangle& tri = *(Triangle*)(&meshes[mesh_it][tri_it]);
-
             if (flip_normals) std::swap(tri[1], tri[2]);
             for (auto& v : tri) {
                 // saves the headache of finding the grid voxel for each point
-                // v = { v.z, v.x, v.y };
+                v = { v.z, v.x, v.y };
                 for (i32 i = 0; i < 3; i++) {
-                    // normalize to[0.0, grid_size - 1.0]
-                    v[i] = (grid_size[i] - 1.0) * (v[i] - triangles_min_min) /
-                           (triangles_max_max - triangles_min_min);
+                    v[i] = ((grid_size[i] - 1.0) / (triangles_max_max - triangles_min_min)) *
+                           (v[i] - triangles_min_min);
                 }
             }
         }
@@ -323,7 +317,7 @@ Voxelizer::voxelize(unsigned char grid[],
                 Triangle& tri = *(Triangle*)(&meshes[mesh_it][tri_it]);
                 assert(std::all_of(tri.begin(), tri.end(), [&](const vec3& v) {
                     bool res = true;
-                    for (int i = 0; i < 3; i++) res = res && v[i] >= 0.0 && v[i] < grid_size[i];
+                    for (int i = 0; i < 3; i++) { res = res && v[i] >= 0.0 && v[i] < grid_size[i]; }
                     return res;
                 }));
 
@@ -340,12 +334,13 @@ Voxelizer::voxelize(unsigned char grid[],
                 vec3 edges[3];
                 for (int i = 0; i < 3; i++) edges[i] = tri[(i + 1) % 3] - tri[i];
 
+                const i32       rast_coord = 2;
                 VoxelData::Type type;
-                if (std::abs(tri_normal.z) < epsilon)
+                if (std::abs(tri_normal[rast_coord]) < epsilon)
                     type = VoxelData::BOTH;
-                else if (tri_normal.z < 0.0)
+                else if (tri_normal[rast_coord] < 0.0)
                     type = VoxelData::OPENING;
-                else if (tri_normal.z > 0.0)
+                else if (tri_normal[rast_coord] > 0.0)
                     type = VoxelData::CLOSING;
 
                 for (i32 z = aligned_min[0]; z <= aligned_max[0]; z++) {
@@ -369,34 +364,34 @@ Voxelizer::voxelize(unsigned char grid[],
 
                                 vec3 max_coll //
                                     = *std::max_element(colls.cbegin(), colls.cend(),
-                                                        [](const vec3& l, const vec3& r) {
+                                                        [=](const vec3& l, const vec3& r) {
                                                             // return l[0] < r[0]; FIXME
-                                                            return l.z < r.z;
+                                                            return l[rast_coord] < r[rast_coord];
                                                         });
 
                                 VoxelData* voxel = &((VoxelData*)data)[at];
                                 // update only max offset collision
-                                if (max_coll.z + epsilon < voxel->max_coll_off) continue;
+                                if (max_coll[rast_coord] + epsilon < voxel->max_coll_off) continue;
 
                                 // new voxel or prev collision is less than current max
                                 // collision is updated
                                 if (voxel->max_type == VoxelData::NONE ||
-                                    max_coll.z > voxel->max_coll_off) {
+                                    max_coll[rast_coord] > voxel->max_coll_off) {
                                     voxel->max_type     = type;
-                                    voxel->max_coll_off = max_coll.z;
+                                    voxel->max_coll_off = max_coll[rast_coord];
                                 }
                                 // collision points are equal, favor? closing triangles
                                 // FIXME: add left-of / right-of collision type to decide
                                 // which collision to favor
                                 else if (type == VoxelData::CLOSING) {
                                     voxel->max_type     = type;
-                                    voxel->max_coll_off = max_coll.z;
+                                    voxel->max_coll_off = max_coll[rast_coord];
                                 }
                                 /*
-                                   else if (max_coll.z == voxel->max_coll_off &&
-                                   max_coll.z == aabb[1].z) { if (type == VoxelData::CLOSING)
-                                   { voxel->max_type = type; voxel->max_coll_off =
-                                   max_coll.z; }
+                                   else if (max_coll[rast_coord] == voxel->max_coll_off &&
+                                   max_coll[rast_coord] == aabb[1][rast_coord]) { if (type ==
+                                   VoxelData::CLOSING) { voxel->max_type = type; voxel->max_coll_off =
+                                   max_coll[rast_coord]; }
                                    }
                                 */
                             }
@@ -414,7 +409,7 @@ Voxelizer::voxelize(unsigned char grid[],
 }
 
 size_t
-Voxelizer::size_of_voxel_type_with_collision()
+Voxelizer::size_of_voxel_type_presice()
 {
     return sizeof(VoxelData);
 }

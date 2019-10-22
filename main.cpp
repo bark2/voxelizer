@@ -15,15 +15,17 @@ void
 print_usage()
 {
     printf(
-        "Usage: vox --in file --grid z,x,y [--flood-fill] [--flip-normals] [--magicavoxel --include-normals]\n");
+        "Usage: voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill] [--flip-normals] [--magicavoxel] [--precise]\n");
 }
 
+using Triangle           = std::array<std::array<double, 3>, 3>;
 double scene_aabb_min[3] = { std::numeric_limits<double>::max(), std::numeric_limits<double>::max(),
                              std::numeric_limits<double>::max() };
 double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
                              -std::numeric_limits<double>::max() };
-using Triangle           = std::array<std::array<double, 3>, 3>;
-std::vector<Triangle> triangles;
+std::vector<Triangle>  triangles;
+std::vector<Triangle*> meshes;
+std::vector<size_t>    meshes_size;
 
 int
 main(int argc, char* argv[])
@@ -35,19 +37,24 @@ main(int argc, char* argv[])
     if (!arg_input_file) {
         printf("Input Error: must specify input file\n");
         print_usage();
+        fflush(stdout);
         return 1;
     }
     sscanf(arg_input_file[1], "%s", filename);
     if (!strstr(filename, ".itd")) {
-        printf("Input Error: file extention isnt supported\n");
+        printf("Input Error: file extention isnt supported, only .itd files\n");
+        fflush(stdout);
         return 1;
     }
     assert(strlen(filename) < IRIT_LINE_LEN_VLONG - 5);
 
+    FILE*  out               = stdout;
     char   out_filename[128] = {};
     char** arg_output_file   = get_cmd(argv, argv + argc, "--out");
-    if (arg_output_file)
+    if (arg_output_file) {
         sscanf(arg_output_file[1], "%s", out_filename);
+        out = fopen(out_filename, "w+");
+    }
     else {
         char* start     = strrchr(filename, '/');
         start           = start ? start + 1 : filename;
@@ -81,7 +88,7 @@ main(int argc, char* argv[])
     if (get_cmd(argv, argv + argc, "--flip-normals")) flip_normals = true;
 
     bool use_collision_detection = false;
-    if (get_cmd(argv, argv + argc, "--use-collision-detection")) use_collision_detection = true;
+    if (get_cmd(argv, argv + argc, "--precise")) use_collision_detection = true;
 
     enum class FORMAT { RAW, MAGICAVOXEL } do_export = FORMAT::RAW;
     char** arg_format                                = get_cmd(argv, argv + argc, "--magicavoxel");
@@ -92,8 +99,11 @@ main(int argc, char* argv[])
         return 1;
     }
 
-    double(*meshes[])[3][3] = { (double(*)[3][3])triangles.data() };
-    size_t triangle_count   = triangles.size();
+    // size_t meshes_tri_count = 0;
+    // for (auto& mesh_size : meshes_size) {
+    // meshes.push_back(triangles.data() + meshes_tri_count);
+    // meshes_tri_count += mesh_size;
+    // }
 
     unsigned char* grid = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2] / 8, 1);
     if (!grid) return 1;
@@ -105,15 +115,21 @@ main(int argc, char* argv[])
     }
     else {
         data = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2],
-                                      Voxelizer::size_of_voxel_type_with_collision());
+                                      Voxelizer::size_of_voxel_type_presice());
     }
 
+    meshes.push_back(triangles.data());
+    size_t       triangle_count = triangles.size();
     unsigned int voxel_count;
-    char err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2], meshes,
-                                   &triangle_count, 1, flip_normals, (double*)&scene_aabb_min,
-                                   (double*)&scene_aabb_max, flood_fill, use_collision_detection, data);
+    char         err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2],
+                                   (double(**)[3][3])meshes.data(), &triangle_count, 1, flip_normals,
+                                   (double*)&scene_aabb_min, (double*)&scene_aabb_max, flood_fill,
+                                   use_collision_detection, data);
 
-    if (do_export == FORMAT::RAW) { export_raw(grid, grid_size); }
+    if (do_export == FORMAT::RAW) {
+        if (out != stdout) printf("voxels:\t%u\n", voxel_count);
+        export_raw(grid, grid_size, out);
+    }
     else {
         printf("voxels:\t%u\n", voxel_count);
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));

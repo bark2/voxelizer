@@ -1,5 +1,6 @@
 // #include "stdafx.h"
 #include "iritSkel.h"
+#include "math.h"
 #include "types.h"
 #include <array>
 #include <vector>
@@ -49,7 +50,7 @@ bool
 CGSkelProcessIritDataFiles(const char* file_name)
 {
     IPObjectStruct* PObjects;
-    IrtHmgnMatType CrntViewMat;
+    IrtHmgnMatType  CrntViewMat;
 
     /* Get the data files: */
     IPSetFlattenObjects(FALSE);
@@ -62,8 +63,8 @@ CGSkelProcessIritDataFiles(const char* file_name)
         IRIT_GEN_COPY(CrntViewMat, IPViewMat, sizeof(IrtHmgnMatType));
 
     /* Here some useful parameters to play with in tesselating freeforms: */
-    CGSkelFFCState.FineNess = 20;            /* Res. of tesselation, larger is finer. */
-    CGSkelFFCState.FourPerFlat = TRUE;       /* 4 poly per ~flat patch, 2 otherwise.*/
+    CGSkelFFCState.FineNess          = 20;   /* Res. of tesselation, larger is finer. */
+    CGSkelFFCState.FourPerFlat       = TRUE; /* 4 poly per ~flat patch, 2 otherwise.*/
     CGSkelFFCState.LinearOnePolyFlag = TRUE; /* Linear srf gen. one poly. */
 
     /* Traverse ALL the parsed data, recursively. */
@@ -111,78 +112,188 @@ CGSkelDumpOneTraversedObject(IPObjectStruct* PObj, IrtHmgnMatType Mat, void* Dat
  *   bool:		false - fail, true - success.                                *
  *****************************************************************************/
 
-bool
-CGSkelStoreData(IPObjectStruct* PObj)
+void
+triangulate_ear_clipping(IPPolygonStruct* poly)
+{
+    using Triangle = std::array<std::array<double, 3>, 3>;
+    using IVoxelizer::epsilon;
+    using IVoxelizer::is_point_in_triangle;
+    using IVoxelizer::vec2;
+    using IVoxelizer::vec3;
+
+    extern double                 scene_aabb_min[3];
+    extern double                 scene_aabb_max[3];
+    extern std::vector<Triangle>  triangles;
+    extern std::vector<Triangle*> meshes;
+    extern std::vector<size_t>    meshes_size;
+
+    IPVertexStruct* p;
+    IPVertexStruct* prev;
+    IPVertexStruct* curr;
+    IPVertexStruct* next;
+    IPVertexStruct* botleft;
+    Triangle        t;
+
+    vec3   n       = { poly->Plane[0], poly->Plane[1], poly->Plane[2] };
+    double inv     = 1 / n.length();
+    double cos     = n[2] * inv;
+    double sin     = std::sqrt(std::pow(n[0], 2) + std::pow(n[1], 2)) * inv;
+    double u1      = n[1] * inv;
+    double u2      = n[0] * inv;
+    auto   proj_xy = [=](IPVertexStruct* pv) {
+        vec3 v  = { pv->Coord[0], pv->Coord[1], pv->Coord[2] };
+        vec3 m1 = { cos + std::pow(u1, 2) * (1 - cos), u1 * u2 * (1 - cos), u2 * sin };
+        vec3 m2 = { u1 * u2 * (1 - cos), cos + std::pow(u2, 2) * (1 - cos), -u1 * sin };
+        return vec2(dot(m1, v), dot(m2, v));
+    };
+
+    int vertex_count = 1;
+    for (prev = poly->PVertex; prev->Pnext; prev = prev->Pnext, vertex_count++)
+        ;
+    prev->Pnext = poly->PVertex;
+    printf("vertex count: %d\n", vertex_count);
+
+    prev    = poly->PVertex;
+    botleft = prev;
+    for (int i = 0; i < vertex_count; i++) {
+        if (proj_xy(prev).x < proj_xy(botleft).x ||
+            (proj_xy(prev).x == proj_xy(botleft).x && proj_xy(prev).y < proj_xy(botleft).y))
+            botleft = prev;
+        prev = prev->Pnext;
+    }
+
+    for (prev = poly->PVertex; prev->Pnext != botleft;) prev = prev->Pnext;
+    next        = botleft->Pnext;
+    bool is_ccw = IVoxelizer::signed_edge_function(proj_xy(prev), proj_xy(botleft), proj_xy(next)) < 0.0;
+
+    prev         = poly->PVertex;
+    curr         = prev->Pnext;
+    next         = curr->Pnext;
+    int prev_idx = 0, curr_idx = 1, next_idx = 2, p_idx;
+
+    for (; vertex_count >= 3;) {
+        printf("prev: %d, curr: %d, next: %d\n", prev_idx, curr_idx, next_idx);
+        // assumes the polygon is formed in a counter clockwise fashion
+        vec2 proj_prev = proj_xy(prev);
+        vec2 proj_curr = proj_xy(curr);
+        vec2 proj_next = proj_xy(next);
+
+        std::array<vec2, 3> proj_tri = { proj_prev, proj_curr, proj_next };
+        bool concave = is_ccw ? IVoxelizer::signed_edge_function(proj_prev, proj_next, proj_curr) < 0.0
+                              : IVoxelizer::signed_edge_function(proj_prev, proj_next, proj_curr) > 0.0;
+
+        if (concave) {
+            prev     = prev->Pnext;
+            curr     = curr->Pnext;
+            next     = next->Pnext;
+            prev_idx = (prev_idx + 1 == vertex_count) ? 0 : prev_idx + 1;
+            curr_idx = (curr_idx + 1 == vertex_count) ? 0 : curr_idx + 1;
+            next_idx = (next_idx + 1 == vertex_count) ? 0 : next_idx + 1;
+            if (prev == poly->PVertex) {
+                printf("ear not found\n");
+                break;
+            }
+            continue;
+        }
+
+        bool is_ear = true;
+        p           = poly->PVertex;
+        int p_idx   = 0;
+        do {
+            printf("\ttest p: %d\n", p_idx);
+            vec2 proj_p = proj_xy(p);
+
+            if (p == prev || p == curr || p == next) {
+                p_idx++;
+                continue;
+            }
+
+            if (is_point_in_triangle(proj_tri, true, proj_p)) {
+                is_ear = false;
+                break;
+            }
+
+            p = p->Pnext;
+            p_idx++;
+        } while (p_idx != vertex_count);
+
+        if (!is_ear) {
+            prev     = prev->Pnext;
+            curr     = curr->Pnext;
+            next     = next->Pnext;
+            prev_idx = (prev_idx + 1 == vertex_count) ? 0 : prev_idx + 1;
+            curr_idx = (curr_idx + 1 == vertex_count) ? 0 : curr_idx + 1;
+            next_idx = (next_idx + 1 == vertex_count) ? 0 : next_idx + 1;
+            if (prev == poly->PVertex) {
+                printf("ear not found\n");
+                break;
+            }
+            continue;
+        }
+
+        t[0] = { prev->Coord[0], prev->Coord[1], prev->Coord[2] };
+        t[1] = { curr->Coord[0], curr->Coord[1], curr->Coord[2] };
+        t[2] = { next->Coord[0], next->Coord[1], next->Coord[2] };
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 3; j++) {
+                scene_aabb_max[j] = std::max(scene_aabb_max[j], t[i][j]);
+                scene_aabb_min[j] = std::min(scene_aabb_min[j], t[i][j]);
+            }
+        }
+
+        triangles.push_back(t);
+        prev->Pnext = next; // FIXME: memory leak
+        curr        = next;
+        next        = next->Pnext;
+        vertex_count--;
+        printf("ear found\n");
+    }
+}
+
+void
+triangulate_convex(IPPolygonStruct* poly)
 {
     using Triangle = std::array<std::array<double, 3>, 3>;
 
-    extern double scene_aabb_min[3];
-    extern double scene_aabb_max[3];
+    extern double                scene_aabb_min[3];
+    extern double                scene_aabb_max[3];
     extern std::vector<Triangle> triangles;
-    int i;
-    const char* Str;
-    double RGB[3], Transp;
-    IPPolygonStruct* PPolygon;
-    IPVertexStruct* PVertex;
-    const IPAttributeStruct* Attrs = AttrTraceAttributes(PObj->Attr, PObj->Attr);
+    IPVertexStruct*              PVertex;
 
-    if (PObj->ObjType != IP_OBJ_POLY) {
-        // AfxMessageBox(_T("Non polygonal object detected and ignored"));
-        return true;
-    }
-
-    /* You can use IP_IS_POLYGON_OBJ(PObj) and IP_IS_POINTLIST_OBJ(PObj)
-       to identify the type of the object*/
-
-    if (CGSkelGetObjectColor(PObj, RGB)) { /* color code */
-    }
-    if (CGSkelGetObjectTransp(PObj, &Transp)) { /* transparency code */
-    }
-    if ((Str = CGSkelGetObjectTexture(PObj)) != NULL) { /* volumetric texture code */
-    }
-    if ((Str = CGSkelGetObjectPTexture(PObj)) != NULL) { /* parametric texture code */
-    }
-    if (Attrs != NULL) {
-        while (Attrs) {
-            /* attributes code */
-            Attrs = AttrTraceAttributes(Attrs, NULL);
-        }
-    }
-
-    int triangle_count = 0;
-    for (PPolygon = PObj->U.Pl; PPolygon != NULL; PPolygon = PPolygon->Pnext) triangle_count++;
-    triangles.reserve(triangle_count);
-
-    for (PPolygon = PObj->U.Pl; PPolygon != NULL; PPolygon = PPolygon->Pnext) {
-        if (PPolygon->PVertex == NULL) {
-            // AfxMessageBox(_T("Dump: Attemp to dump empty polygon"));
-            return false;
-        }
-
-        Triangle t;
-        int vi = 0;
-        PVertex = PPolygon->PVertex;
-        do {
-            for (int j = 0; j < 3; j++) {
-                double x = PVertex->Coord[j];
-                scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
-                scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
-                if (vi < 3)
-                    t[vi][j] = x;
-                else {
-                    t[1][j] = t[2][j];
-                    t[2][j] = x;
-                }
+    Triangle t;
+    int      vi = 0;
+    PVertex     = poly->PVertex;
+    do {
+        for (int j = 0; j < 3; j++) {
+            double x          = PVertex->Coord[j];
+            scene_aabb_max[j] = std::max(scene_aabb_max[j], x);
+            scene_aabb_min[j] = std::min(scene_aabb_min[j], x);
+            if (vi < 3)
+                t[vi][j] = x;
+            else {
+                t[1][j] = t[2][j];
+                t[2][j] = x;
             }
+        }
 
-            vi++;
-            if (vi >= 3) triangles.push_back(t);
+        vi++;
+        if (vi >= 3) triangles.push_back(t);
 
-            PVertex = PVertex->Pnext;
-        } while (PVertex != PPolygon->PVertex && PVertex != NULL);
-        /* Close the polygon. */
+        PVertex = PVertex->Pnext;
+    } while (PVertex != poly->PVertex && PVertex != NULL);
+}
+
+bool
+CGSkelStoreData(IPObjectStruct* PObj)
+{
+    if (PObj->ObjType != IP_OBJ_POLY) return true;
+
+    for (auto poly = PObj->U.Pl; poly != NULL; poly = poly->Pnext) {
+        if (poly->PVertex == NULL) return false;
+        // triangulate_earclipping(poly);
+        triangulate_convex(poly);
     }
-    /* Close the object. */
+
     return true;
 }
 
@@ -221,7 +332,8 @@ CGSkelGetObjectColor(IPObjectStruct* PObj, double RGB[3])
         for (i = 0; i < 3; i++) RGB[i] = RGBIColor[i] / 255.0;
 
         return TRUE;
-    } else if ((Color = AttrGetObjectColor(PObj)) != IP_ATTR_NO_COLOR) {
+    }
+    else if ((Color = AttrGetObjectColor(PObj)) != IP_ATTR_NO_COLOR) {
         for (i = 0; TransColorTable[i][0] >= 0; i++) {
             if (TransColorTable[i][0] == Color) {
                 for (j = 0; j < 3; j++) RGB[j] = TransColorTable[i][j + 1] / 255.0;
