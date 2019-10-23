@@ -32,6 +32,10 @@ Options:
 
 --precise
         use the collision method for generating voxels
+--magicavoxel
+        ouput magicavoxel instead of printing to stdout.
+        *** magicavoxel file format doesnt support a grid dimension higher than 128 ***
+
 
 Building the executable:
 Windows:
