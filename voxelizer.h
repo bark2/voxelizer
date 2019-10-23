@@ -32,7 +32,6 @@ char voxelize(unsigned char output_grid[], // output bitfield grid, should be in
               double        triangles_max[3] = nullptr, // the max for all meshes for each coordinate
               bool          flood_fill       = false,   // should flood fill
               bool          precise = false, // should use collision detection function to output voxels
-              unsigned char voxel_types[] = nullptr // output voxel types if specified non null
-);
-
+              unsigned char voxel_types[] = nullptr, // output voxel types if specified non null
+              bool          verbose       = false);
 }

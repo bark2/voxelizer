@@ -24,8 +24,6 @@ double scene_aabb_min[3] = { std::numeric_limits<double>::max(), std::numeric_li
 double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
                              -std::numeric_limits<double>::max() };
 std::vector<Triangle>  triangles;
-std::vector<Triangle*> meshes;
-std::vector<size_t>    meshes_size;
 
 int
 main(int argc, char* argv[])
@@ -90,6 +88,9 @@ main(int argc, char* argv[])
     bool use_collision_detection = false;
     if (get_cmd(argv, argv + argc, "--precise")) use_collision_detection = true;
 
+    bool verbose = false;
+    if (get_cmd(argv, argv + argc, "--verbose")) verbose = true;
+
     enum class FORMAT { RAW, MAGICAVOXEL } do_export = FORMAT::RAW;
     char** arg_format                                = get_cmd(argv, argv + argc, "--magicavoxel");
     if (arg_format) do_export = FORMAT::MAGICAVOXEL;
@@ -98,12 +99,6 @@ main(int argc, char* argv[])
         printf("Error: irit parser\n");
         return 1;
     }
-
-    // size_t meshes_tri_count = 0;
-    // for (auto& mesh_size : meshes_size) {
-    // meshes.push_back(triangles.data() + meshes_tri_count);
-    // meshes_tri_count += mesh_size;
-    // }
 
     unsigned char* grid = (unsigned char*)calloc(grid_size[0] * grid_size[1] * grid_size[2] / 8, 1);
     if (!grid) return 1;
@@ -118,13 +113,13 @@ main(int argc, char* argv[])
                                       Voxelizer::size_of_voxel_type_presice());
     }
 
-    meshes.push_back(triangles.data());
+    double(*meshes[1])[3][3]       = { (double(*)[3][3])triangles.data() };
     size_t       triangle_count = triangles.size();
     unsigned int voxel_count;
-    char         err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2],
-                                   (double(**)[3][3])meshes.data(), &triangle_count, 1, flip_normals,
-                                   (double*)&scene_aabb_min, (double*)&scene_aabb_max, flood_fill,
-                                   use_collision_detection, data);
+    char err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2], meshes,
+                                   &triangle_count, 1, flip_normals, (double*)&scene_aabb_min,
+                                   (double*)&scene_aabb_max, flood_fill, use_collision_detection, data,
+                                   verbose);
 
     if (do_export == FORMAT::RAW) {
         if (out != stdout) printf("voxels:\t%u\n", voxel_count);
@@ -133,6 +128,7 @@ main(int argc, char* argv[])
     else {
         printf("voxels:\t%u\n", voxel_count);
         assert(std::all_of(grid_size.cbegin(), grid_size.cend(), [](const int& x) { return x < 129; }));
+        if (verbose) printf("exporting to %s\n", out_filename);
         if (export_magicavoxel(out_filename, grid, grid_size, voxel_count, use_collision_detection,
                                data))
             assert(0 && "couldn't not open the vox file");

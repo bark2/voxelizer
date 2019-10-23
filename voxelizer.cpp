@@ -9,10 +9,13 @@
 #include <tuple>
 #include <utility>
 
+#define vprintf(verbose, ...)                                                                           \
+    if (verbose) printf(__VA_ARGS__);
+
 using namespace IVoxelizer;
 using Voxelizer::VoxelType;
 
-u8
+static u8
 flood_fill_rast_collision_detection(u8                   grid[],
                                     VoxelData            data[],
                                     const array<i32, 3>& grid_size,
@@ -52,7 +55,7 @@ flood_fill_rast_collision_detection(u8                   grid[],
     return result;
 }
 
-u32
+static u32
 flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
 {
     u32 voxel_count = 0;
@@ -104,23 +107,25 @@ flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
     return voxel_count;
 }
 
-extern unsigned int qtri;
 static inline bool
 write_voxel(u8                   grid[],
             Voxelizer::VoxelType data[],
             const array<i32, 3>& grid_size,
             const vec3&          p,
             Voxelizer::VoxelType type,
-            bool                 flood_fill)
+            bool                 flood_fill, bool verbose)
 {
-    bool   new_voxel = false;
+    bool   is_new_voxel = false;
     size_t voxel_num =
         floor(p[0]) * grid_size[1] * grid_size[2] + floor(p[1]) * grid_size[2] + floor(p[2]);
 
     if (!get_voxel(grid, voxel_num)) {
-        new_voxel = true;
+        is_new_voxel = true;
         set_voxel(grid, voxel_num);
-        if (data || flood_fill) data[voxel_num] = type;
+        if (data || flood_fill) {
+            data[voxel_num] = type;
+            vprintf(verbose, "new voxel type: %d\n", type)
+        }
     }
     else if (data || flood_fill) {
         Voxelizer::VoxelType ctype = data[voxel_num];
@@ -128,7 +133,7 @@ write_voxel(u8                   grid[],
             (ctype == Voxelizer::VoxelType::CLOSING && type == Voxelizer::VoxelType::OPENING))
             data[voxel_num] = Voxelizer::VoxelType::CROUDED;
     }
-    return new_voxel;
+    return is_new_voxel;
 }
 
 char
@@ -145,7 +150,7 @@ Voxelizer::voxelize(unsigned char grid[],
                     double        triangles_max[3],
                     bool          flood_fill,
                     bool          use_collision_detection,
-                    unsigned char data[])
+                    unsigned char data[], bool verbose)
 {
     if (flood_fill && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
     if (use_collision_detection && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
@@ -193,8 +198,13 @@ Voxelizer::voxelize(unsigned char grid[],
             for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
                 Triangle& tri        = *(Triangle*)(&meshes[mesh_it][tri_it]);
                 vec3      tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
+                if (tri_normal.length() < epsilon) {
+                    printf("Warning: degenerated triangle is skipped\n");
+                    continue;
+                }
+
                 VoxelType type;
-                if (flood_fill) {
+                if (flood_fill || data) {
                     if (std::abs(tri_normal.z) < epsilon)
                         type = VoxelType::BOTH;
                     else if (tri_normal.z < 0.0)
@@ -217,23 +227,29 @@ Voxelizer::voxelize(unsigned char grid[],
                     std::sort(tri.begin(), tri.end(),
                               [=](const vec3& lhs, const vec3& rhs) { return lhs[yi] < rhs[yi]; });
 
-                    // printf("\n");
-                    // printf("tri: %u ", tri_it);
-                    // for (auto& v : tri) printf("%s ", v.to_string().c_str());
-                    // printf("\n");
+                    vprintf(verbose, "\n");
+                    vprintf(verbose, "tri: %u ", tri_it);
+                    for (auto& v : tri) vprintf(verbose, "%s ", v.to_string().c_str());
+                    vprintf(verbose, "\n");
+                    vprintf(verbose, "edge[0]: %s\t%s\n", tri[0].to_string().c_str(), tri[2].to_string().c_str());
+                    vprintf(verbose, "edge[1]: %s\t%s\n", tri[0].to_string().c_str(), tri[1].to_string().c_str());
+                    vprintf(verbose, "edge[2]: %s\t%s\n", tri[1].to_string().c_str(), tri[2].to_string().c_str());
 
                     const f64 a    = tri_normal[xi];
                     const f64 b    = tri_normal[yi];
                     const f64 c    = tri_normal[zi];
                     const f64 d    = -dot(tri_normal, tri[0]);
-                    const f64 dzdx = -a / c;
-                    const f64 dzdy = -b / c;
-                    const f64 w    = -d / c;
+                    // FIXME c could be zero
+                    const f64 dzdx = -a/c;
+                    const f64 dzdy = -b/c;
+                    const f64 w    = -d/c;
+                    vprintf(verbose, "a: %f,b: %f,c: %f,d: %f,dzdx: %f,dzdy: %f,w: %f\n", a, b, c, d, dzdx,
+                               dzdy, w);
 
                     const f64 dx[3] = {
-                        (tri[2][xi] - tri[0][xi]) / (tri[2][yi] - tri[0][yi]), //
-                        (tri[1][xi] - tri[0][xi]) / (tri[1][yi] - tri[0][yi]), //
-                        (tri[2][xi] - tri[1][xi]) / (tri[2][yi] - tri[1][yi])  //
+                        (tri[2][xi] - tri[0][xi]) / (tri[2][yi] - tri[0][yi]), // edge[0]
+                        (tri[1][xi] - tri[0][xi]) / (tri[1][yi] - tri[0][yi]), // edge[1]
+                        (tri[2][xi] - tri[1][xi]) / (tri[2][yi] - tri[1][yi])  // edge[2]
                     };
 
                     struct Edge {
@@ -244,14 +260,14 @@ Voxelizer::voxelize(unsigned char grid[],
                     edges[0].dx = dx[0];
                     edges[0].x  = tri[0][xi];
 
+                    edges[1].dx = dx[1];
+                    edges[1].x  = tri[0][xi];
                     bool horizontal_first_edge = (tri[0][yi] == tri[1][yi]);
+                    vprintf(verbose, "horizontal first edge: %s\n",
+                            horizontal_first_edge ? "true" : "false");
                     if (horizontal_first_edge) {
                         edges[1].dx = dx[2];
                         edges[1].x  = tri[1][xi];
-                    }
-                    else {
-                        edges[1].dx = dx[1];
-                        edges[1].x  = tri[0][xi];
                     }
 
                     u8 le = (tri[0][xi] + edges[0].dx * (tri[1][yi] - tri[0][yi]) < tri[1][xi] ? 0 : 1);
@@ -264,23 +280,25 @@ Voxelizer::voxelize(unsigned char grid[],
                         if (curr[yi] >= tri[1][yi] && curr[yi] - 1.0 < tri[1][yi]) {
                             edges[1].dx = dx[2];
                             edges[1].x  = tri[1][xi] + (curr[yi] - tri[1][yi]) * edges[1].dx;
-                            curr[zi]    = dzdx * edges[le].x + dzdy * curr[yi] + w;
-                            // printf("next edge: dx: %F, x: %F\n", edges[1].dx, edges[1].x);
+                            if ((std::abs(curr[yi] - tri[1][yi]) < epsilon)) edges[1].x = tri[1][xi];
+                            curr[zi] = dzdx * edges[le].x + dzdy * curr[yi] + w;
+                            vprintf(verbose, "next edge: dx: %F, x: %F\n", edges[1].dx, edges[1].x);
                         }
-                        // printf("curr[yi]: %F\n", curr[yi]);
+                        vprintf(verbose,"curr[yi]: %F\n", curr[yi]);
                         f64 start_z = curr[zi];
                         for (curr[xi] = edges[le].x; curr[xi] <= edges[re].x;
                              curr[xi] += 1.0, curr[zi] += dzdx) {
-                            // printf("\tcurr[xi]: %F\t", curr[xi]);
-
-                            // f64 z = dzdx * curr[xi] + dzdy * curr[yi] + w;
-                            // printf("curr[zi]:   %F,       z: %F\n", curr[zi], z);
-                            // if (curr[zi] - z > epsilon) printf("\tWarning: curr[zi] != z\n");
-                            // fflush(stdout);
+                            if (verbose) {
+                                vprintf(verbose, "\tcurr[xi]: %F\t", curr[xi]);
+                                f64 z = dzdx * curr[xi] + dzdy * curr[yi] + w;
+                                printf("curr[zi]:   %F,       z: %F\n", curr[zi], z);
+                                if (curr[zi] - z > epsilon)
+                                    vprintf(verbose, "\tWarning: curr[zi] != z\n");
+                            }
                             if (curr[zi] < 0.0) continue;
 
-                            bool new_voxel =
-                                write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                            bool new_voxel = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
+                                                         flood_fill, verbose);
                             if (new_voxel) (*voxel_count)++;
                         }
 
@@ -289,7 +307,7 @@ Voxelizer::voxelize(unsigned char grid[],
                         assert(abs(curr[zi] - (dzdx * curr[xi] + dzdy * curr[yi] + w)) < epsilon);
                         if (curr[zi] >= 0.0) {
                             bool new_voxel =
-                                write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                                write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
                             if (new_voxel) (*voxel_count)++;
                         }
 
@@ -300,10 +318,10 @@ Voxelizer::voxelize(unsigned char grid[],
 
                     curr = tri[1];
                     bool new_voxel =
-                        write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                        write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
                     if (new_voxel) (*voxel_count)++;
                     curr      = tri[2];
-                    new_voxel = write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill);
+                    new_voxel = write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
                     if (new_voxel) (*voxel_count)++;
                 }
             }
@@ -365,7 +383,6 @@ Voxelizer::voxelize(unsigned char grid[],
                                 vec3 max_coll //
                                     = *std::max_element(colls.cbegin(), colls.cend(),
                                                         [=](const vec3& l, const vec3& r) {
-                                                            // return l[0] < r[0]; FIXME
                                                             return l[rast_coord] < r[rast_coord];
                                                         });
 

@@ -114,7 +114,7 @@ export_magicavoxel(const char*         filename,
                                     switch (type) {
                                     case Voxelizer::VoxelType::OPENING: color = 122; break;
                                     case Voxelizer::VoxelType::CLOSING: color = 218; break;
-                                    case Voxelizer::VoxelType::CROUDED: color = 7 << 5; break;
+                                    case Voxelizer::VoxelType::CROUDED: color = (7 << 5); break;
                                     default: break;
                                     }
                                 }
