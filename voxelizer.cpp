@@ -70,8 +70,8 @@ flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
             last = { VoxelType::CLOSING, std::numeric_limits<i32>::max() };
             for (i32 y = 0; y < grid_size[2]; y++) {
                 i32       voxel_num = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
-                VoxelType type      = data[voxel_num];
                 if (get_voxel(grid, voxel_num)) {
+                VoxelType type      = data[voxel_num];
                     switch (type) {
                     case VoxelType::OPENING: {
                         last.type = VoxelType::OPENING;
@@ -79,8 +79,9 @@ flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
                         voxel_count++;
                     }; break;
                     case VoxelType::CROUDED: {
-                        // voxel_count isn't incremented
+                        // voxel_count isn't incremented, and last type y value isnt updated
                         set_voxel(grid, voxel_num, false);
+                        last.type = VoxelType::CLOSING;
                     }; break;
                     case VoxelType::CLOSING: {
                         last.type = VoxelType::CLOSING;
@@ -122,6 +123,7 @@ write_voxel(u8                   grid[],
     if (!get_voxel(grid, voxel_num)) {
         is_new_voxel = true;
         set_voxel(grid, voxel_num);
+
         if (data || flood_fill) {
             data[voxel_num] = type;
             vprintf(verbose, "new voxel type: %d\n", type)
@@ -132,6 +134,7 @@ write_voxel(u8                   grid[],
         if ((ctype == Voxelizer::VoxelType::OPENING && type == Voxelizer::VoxelType::CLOSING) ||
             (ctype == Voxelizer::VoxelType::CLOSING && type == Voxelizer::VoxelType::OPENING))
             data[voxel_num] = Voxelizer::VoxelType::CROUDED;
+        else if (ctype == Voxelizer::BOTH) data[voxel_num] = type;
     }
     return is_new_voxel;
 }
