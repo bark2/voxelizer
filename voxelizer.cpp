@@ -80,7 +80,9 @@ flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
                     }; break;
                     case VoxelType::CROUDED: {
                         // voxel_count isn't incremented, and last type y value isnt updated
-                        set_voxel(grid, voxel_num, false);
+                        // set_voxel(grid, voxel_num, false);
+                        last.y    = y;
+                        voxel_count++;
                         last.type = VoxelType::CLOSING;
                     }; break;
                     case VoxelType::CLOSING: {
