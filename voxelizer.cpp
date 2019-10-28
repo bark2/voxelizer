@@ -153,13 +153,13 @@ write_voxel(u8                   grid[],
             bool                 verbose)
 {
     unsigned result = 0;
-    // for (int i = 0; i < 3; i++) {
-        // if (p[i] >= 1.0 && floor(p[i]) == p[i]) {
-            // vec3 prev = p;
-            // prev[i] -= 1.0;
-            // result += write_voxel_imp(grid, data, grid_size, prev, type, flood_fill, verbose) ? 1 : 0;
-        // }
-    // }
+    for (int i = 0; i < 3; i++) {
+        if (p[i] >= 1.0 && floor(p[i]) == p[i]) {
+            vec3 prev = p;
+            prev[i] -= 1.0;
+            result += write_voxel_imp(grid, data, grid_size, prev, type, flood_fill, verbose) ? 1 : 0;
+        }
+    }
     result += write_voxel_imp(grid, data, grid_size, p, type, flood_fill, verbose) ? 1 : 0;
     return result;
 }
@@ -306,8 +306,18 @@ Voxelizer::voxelize(unsigned char grid[],
 
                     vec3 curr;
                     curr[zi] = dzdx * edges[le].x + dzdy * tri[0][yi] + w;
+                    curr[yi] = tri[0][yi];
+                    curr[xi] = tri[0][xi];
 
-                    for (curr[yi] = tri[0][yi]; curr[yi] <= tri[2][yi];) {
+                    unsigned new_voxels =
+                        write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
+                    (*voxel_count) += new_voxels;
+
+                    curr[yi] = ceil(tri[0][yi]);
+                    for (auto& e : edges) e.x += e.dx * (curr[yi] - tri[0][yi]);
+                    curr[zi] += (edges[le].dx * dzdx + dzdy) * (curr[yi] - tri[0][yi]);
+
+                    while (curr[yi] <= tri[2][yi]) {
                         if (curr[yi] >= tri[1][yi] && curr[yi] - 1.0 < tri[1][yi]) {
                             edges[1].dx = dx[2];
                             edges[1].x  = tri[1][xi] + (curr[yi] - tri[1][yi]) * edges[1].dx;
@@ -328,8 +338,8 @@ Voxelizer::voxelize(unsigned char grid[],
                             }
                             if (curr[zi] < 0.0) continue;
 
-                            unsigned new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
-                                                         flood_fill, verbose);
+                            new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
+                                                     flood_fill, verbose);
                             (*voxel_count) += new_voxels;
                         }
 
@@ -337,7 +347,7 @@ Voxelizer::voxelize(unsigned char grid[],
                         curr[xi] = edges[re].x;
                         assert(abs(curr[zi] - (dzdx * curr[xi] + dzdy * curr[yi] + w)) < epsilon);
                         if (curr[zi] >= 0.0) {
-                            unsigned new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
+                            new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
                                                          flood_fill, verbose);
                             (*voxel_count) += new_voxels;
                         }
@@ -346,51 +356,6 @@ Voxelizer::voxelize(unsigned char grid[],
                         for (auto& e : edges) e.x += e.dx;
                         curr[zi] = start_z + edges[le].dx * dzdx + dzdy;
                     }
-
-                    if (curr[yi] > tri[2][yi] && tri[2][yi] > floor(curr[yi]) &&
-                        floor(curr[yi]) > tri[0][yi]) {
-                        f64 cy      = floor(curr[yi]);
-                        assert(abs(edges[0].x - dx[0] * (curr[yi] - cy) -
-                                   (tri[2][xi] + dx[0] * (cy - tri[2][yi]))) < epsilon);
-                        edges[0].x -= dx[0] * (curr[yi] - cy);
-
-                        f64 dy     = cy - tri[1][yi];
-                        f64 edx    = dy > 0.0 ? dx[2] : dx[1];
-                        if (tri[1][xi] + edx * dy - (edges[1].x - edx * (curr[yi] - cy)) > epsilon)
-                            int ab = 0;
-                        assert(tri[1][xi] + edx * dy - (edges[1].x - edx * (curr[yi] - cy)) < epsilon);
-                        edges[1].x -= edx * (curr[yi] - cy);
-
-                        curr[yi] = cy;
-                        curr[zi] = dzdx * edges[le].x + dzdy * curr[yi] + w;
-                        for (curr[xi] = edges[le].x; curr[xi] <= edges[re].x;
-                             curr[xi] += 1.0, curr[zi] += dzdx) {
-                            if (curr[zi] < 0.0) continue;
-                            unsigned new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
-                                                         flood_fill, verbose);
-                            (*voxel_count) += new_voxels;
-                        }
-
-                        curr[zi] -= dzdx * (curr[xi] - edges[re].x);
-                        curr[xi] = edges[re].x;
-                        assert(abs(curr[zi] - (dzdx * curr[xi] + dzdy * curr[yi] + w)) < epsilon);
-                        if (curr[zi] >= 0.0) {
-                            unsigned new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
-                                                         flood_fill, verbose);
-                            assert(new_voxels < 4);
-                            (*voxel_count) += new_voxels;
-                        }
-                    }
-
-                    // prev
-                    // curr = tri[1];
-                    // bool new_voxel =
-                    // write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
-                    // if (new_voxel) (*voxel_count)++;
-                    // curr = tri[2];
-                    // new_voxel =
-                    // write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
-                    // if (new_voxel) (*voxel_count)++;
                 }
             }
         }
