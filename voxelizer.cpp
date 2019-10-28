@@ -123,6 +123,9 @@ write_voxel_imp(u8                   grid[],
     size_t voxel_num =
         floor(p[0]) * grid_size[1] * grid_size[2] + floor(p[1]) * grid_size[2] + floor(p[2]);
 
+    if (voxel_num == 843772)
+        int aa =0 ;
+
     if (!get_voxel(grid, voxel_num)) {
         is_new_voxel = true;
         set_voxel(grid, voxel_num);
@@ -305,13 +308,15 @@ Voxelizer::voxelize(unsigned char grid[],
                     u8 re = (le == 0 ? 1 : 0);
 
                     vec3 curr;
-                    curr[zi] = dzdx * edges[le].x + dzdy * tri[0][yi] + w;
+                    // curr[zi] = dzdx * edges[le].x + dzdy * tri[0][yi] + w;
+                    curr[zi] = tri[0][zi];
                     curr[yi] = tri[0][yi];
                     curr[xi] = tri[0][xi];
 
-                    unsigned new_voxels =
-                        write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
-                    (*voxel_count) += new_voxels;
+                    unsigned new_voxels;
+                    // unsigned new_voxels =
+                        // write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
+                    // (*voxel_count) += new_voxels;
 
                     curr[yi] = ceil(tri[0][yi]);
                     for (auto& e : edges) e.x += e.dx * (curr[yi] - tri[0][yi]);
@@ -320,7 +325,7 @@ Voxelizer::voxelize(unsigned char grid[],
                     while (curr[yi] <= tri[2][yi]) {
                         if (curr[yi] >= tri[1][yi] && curr[yi] - 1.0 < tri[1][yi]) {
                             edges[1].dx = dx[2];
-                            edges[1].x  = tri[1][xi] + (curr[yi] - tri[1][yi]) * edges[1].dx;
+                            edges[1].x  = tri[1][xi] + (curr[yi] - tri[1][yi]) * dx[2];
                             if ((std::abs(curr[yi] - tri[1][yi]) < epsilon)) edges[1].x = tri[1][xi];
                             curr[zi] = dzdx * edges[le].x + dzdy * curr[yi] + w;
                             vprintf(verbose, "next edge: dx: %F, x: %F\n", edges[1].dx, edges[1].x);
@@ -348,13 +353,56 @@ Voxelizer::voxelize(unsigned char grid[],
                         assert(abs(curr[zi] - (dzdx * curr[xi] + dzdy * curr[yi] + w)) < epsilon);
                         if (curr[zi] >= 0.0) {
                             new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
-                                                         flood_fill, verbose);
+                                                     flood_fill, verbose);
                             (*voxel_count) += new_voxels;
                         }
 
                         curr[yi] += 1.0;
                         for (auto& e : edges) e.x += e.dx;
                         curr[zi] = start_z + edges[le].dx * dzdx + dzdy;
+                    }
+                }
+            }
+        }
+
+        for (i32 z = 0; z < grid_size[0]; z++) {
+            for (i32 x = 0; x < grid_size[1]; x++) {
+                for (i32 y = 0; y < grid_size[2]; y++) {
+                    i32 voxel_num = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
+                    if (get_voxel(grid, voxel_num)) {
+                        i32  nb[26];
+                        nb[0] = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y + 1;
+                        nb[1] = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y - 1;
+                        nb[2] = z * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y;
+                        nb[3] = z * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y;
+                        nb[4] = z * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y + 1;
+                        nb[5] = z * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y + 1;
+                        nb[6] = z * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y - 1;
+                        nb[7] = z * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y - 1;
+
+                        nb[8] = (z + 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
+                        nb[9] = (z + 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y + 1;
+                        nb[10] = (z + 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y - 1;
+                        nb[11] = (z + 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y;
+                        nb[12] = (z + 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y;
+                        nb[13] = (z + 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y + 1;
+                        nb[14] = (z + 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y + 1;
+                        nb[15] = (z + 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y - 1;
+                        nb[16] = (z + 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y - 1;
+
+                        nb[17] = (z - 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
+                        nb[18] = (z - 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y + 1;
+                        nb[19] = (z - 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y - 1;
+                        nb[20] = (z - 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y;
+                        nb[21] = (z - 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y;
+                        nb[22] = (z - 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y + 1;
+                        nb[23] = (z - 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y + 1;
+                        nb[24] = (z - 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y - 1;
+                        nb[25] = (z - 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y - 1;
+
+                        bool alone = std::all_of(std::begin(nb), std::end(nb),
+                                                 [=](const i32& n) { return !get_voxel(grid, n); });
+                        if (alone ) printf("%d\n",voxel_num);
                     }
                 }
             }
