@@ -1,6 +1,6 @@
 #include "voxelizer.h"
-#include "math.h"
-#include "types.h"
+#include "vox_math.h"
+#include "vox_types.h"
 #include <algorithm>
 #include <cassert>
 #include <csignal>
@@ -10,6 +10,7 @@
 #include <random>
 #include <tuple>
 #include <utility>
+#include <chrono>
 
 #define vprintf(verbose, ...)                                                                           \
     if (verbose) printf(__VA_ARGS__);
@@ -182,7 +183,7 @@ flood_fill_rec_scene(u8 grid[],
                      const array<i32, 3>& grid_size,
                      unsigned int         shell_voxel_count)
 {
-    std::default_random_engine          generator;
+    std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
     std::uniform_real_distribution<f64> d[3];
     for (int i = 0; i < 3; i++) d[i] = std::uniform_real_distribution<f64>(0.0, grid_size[i]);
 
@@ -194,6 +195,7 @@ flood_fill_rec_scene(u8 grid[],
     } while (get_voxel(grid, grid_size, iseed) ||
              !is_closed_seed_scene(meshes, meshes_size, meshes_count, seed));
 
+    // printf("using seed: %s\n", seed.to_string().c_str());
     unsigned int voxel_count = shell_voxel_count;
     flood_fill_rec_imp_bfs(grid, flood_fill_mem, grid_size, &voxel_count, static_cast<i32>(seed.x),
                            static_cast<i32>(seed.y), static_cast<i32>(seed.z));
@@ -208,7 +210,7 @@ flood_fill_rec(u8 grid[],
                const array<i32, 3>& grid_size,
                unsigned int         shell_voxel_count)
 {
-    std::default_random_engine          generator;
+    std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
     std::uniform_real_distribution<f64> d[3];
     for (int i = 0; i < 3; i++) d[i] = std::uniform_real_distribution<f64>(0.0, grid_size[i]);
 

@@ -1,5 +1,5 @@
-#include "common.h"
-#include "types.h"
+#include "vox_common.h"
+#include "vox_types.h"
 #include "voxelizer.h"
 
 #include <algorithm>

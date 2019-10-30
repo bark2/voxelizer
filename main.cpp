@@ -1,6 +1,6 @@
-#include "common.h"
-#include "iritSkel.h"
-#include "obj.h"
+#include "vox_common.h"
+#include "vox_iritSkel.h"
+#include "vox_obj.h"
 #include "voxelizer.h"
 #include <algorithm>
 #include <cassert>
@@ -15,7 +15,7 @@ void
 print_usage()
 {
     printf(
-        "Usage: voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill] [--flip-normals] [--magicavoxel] [--precise]\n");
+        "Usage: voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill or --flood-fill-meshes or --fill-scanline] [--flip-normals] [--precise] [--magicavoxel]\n");
 }
 
 using Triangle           = std::array<std::array<double, 3>, 3>;

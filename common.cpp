@@ -1,4 +1,4 @@
-#include "common.h"
+#include "vox_common.h"
 
 namespace IVoxelizer {
 

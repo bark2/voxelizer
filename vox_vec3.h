@@ -1,6 +1,6 @@
 #pragma once
 
-#include "vec2.h"
+#include "vox_vec2.h"
 #include <algorithm>
 #include <cassert>
 #include <cmath>

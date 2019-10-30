@@ -7,8 +7,8 @@
 #include <string>
 #include <vector>
 
-#include "vec2.h"
-#include "vec3.h"
+#include "vox_vec2.h"
+#include "vox_vec3.h"
 
 namespace IVoxelizer {
 

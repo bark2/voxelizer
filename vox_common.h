@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "vox_types.h"
 #include <cassert>
 #include <ostream>
 #include <string>

@@ -47,7 +47,7 @@ Options:
         use the collision method for generating voxels
 
 --magicavoxel
-        ouput magicavoxel instead of printing to stdout.
+        ouput magicavoxel instead of printing to the default one - stdout.
         *** magicavoxel file format doesnt support a grid dimension higher than 128 ***
 
 

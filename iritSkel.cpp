@@ -1,7 +1,7 @@
 // #include "stdafx.h"
-#include "iritSkel.h"
-#include "math.h"
-#include "types.h"
+#include "vox_iritSkel.h"
+#include "vox_math.h"
+#include "vox_types.h"
 #include <array>
 #include <vector>
 
