@@ -32,7 +32,13 @@ Options:
         grid dimensions in x, y, z
 
 --flood-fill
-        do flood fill, only for closed models
+        do flood fill, only for closed models, in which all meshes represent one closed model
+
+--flood-fill-objects
+        do flood fill, only for closed models, in which each mesh represent a different closed model
+
+--fill-scanline
+        do scanline flood filling
 
 --flip-normals
         should normals be flipped

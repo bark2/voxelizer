@@ -252,6 +252,34 @@ line_triangle_intersection_mt(const array<vec3, 2>& line,
     return { true, t };
 }
 
+// in the case of collision, t :: [0, line.length()]
+inline std::pair<bool, f64>
+ray_triangle_intersection_mt(const array<vec3, 2>& ray,
+                             const Triangle&       tri)
+{
+    vec3 dir  = ray[1] - ray[0];
+    vec3 udir = dir / dir.length();
+    vec3 e1   = tri[1] - tri[0];
+    vec3 e2   = tri[2] - tri[0];
+    vec3 pvec = cross(udir, e2);
+
+    f64 denom = dot(e1, pvec);
+    if (std::abs(denom) < epsilon) return { std::abs(dot(pvec, tri[0] - ray[0])) < epsilon, -1.0 };
+
+    f64  inv_denom = 1 / denom;
+    vec3 tvec      = ray[0] - tri[0];
+    vec3 bary;
+    bary[1] = dot(tvec, pvec) * inv_denom;
+    if (bary[1] < 0.0) return { false, {} };
+
+    vec3 qvec = cross(tvec, e1);
+    bary[2]   = dot(udir, qvec) * inv_denom;
+    if (bary[2] < 0.0 || bary[1] + bary[2] > 1.0) return { false, {} };
+
+    auto t = dot(e2, qvec) * inv_denom;
+    return { true, t };
+}
+
 inline std::pair<bool, vec3>
 line_triangle_intersection(const array<vec3, 2>& line, const Triangle& triangle)
 {

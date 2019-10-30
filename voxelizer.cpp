@@ -6,6 +6,8 @@
 #include <csignal>
 #include <cstdio>
 #include <cstring>
+#include <queue>
+#include <random>
 #include <tuple>
 #include <utility>
 
@@ -14,6 +16,215 @@
 
 using namespace IVoxelizer;
 using Voxelizer::VoxelType;
+
+static inline bool
+is_closed_seed_scene(double (*meshes[])[3][3], size_t meshes_size[], size_t meshes_count, vec3 seed)
+{
+    array<vec3, 2> ray;
+    vec3           tmp, p;
+    unsigned int   coll_mesh_it, coll_tri_it;
+    ray[0] = seed;
+
+    for (f64 alpha = 0.0; alpha <= 180.0; alpha += 10.0) {
+        // printf("alpha: %f\n", alpha);
+        for (f64 beta = 0.0; beta < 360.0; beta += 1.0) {
+            ray[1].x = seed.x + sin(alpha) * cos(beta);
+            ray[1].y = seed.y + sin(alpha) * sin(beta);
+            ray[1].z = seed.z + cos(alpha);
+
+            bool found = false;
+            for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++)
+                for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
+                    Triangle& tri  = *(Triangle*)(&meshes[mesh_it][tri_it]);
+                    auto      coll = ray_triangle_intersection_mt(ray, tri);
+                    if (!coll.first) continue;
+                    tmp = lerp(ray, coll.second);
+                    if (!found || //
+                        (found && (tmp - seed).squared_length() < (p - seed).squared_length())) {
+                        found        = true;
+                        p            = tmp;
+                        coll_mesh_it = mesh_it;
+                        coll_tri_it  = tri_it;
+                    }
+                }
+            if (!found) return false;
+
+            Triangle& tri = *(Triangle*)(&meshes[coll_mesh_it][coll_tri_it]);
+            vec3      n   = cross(tri[1] - tri[0], tri[2] - tri[0]);
+            if (dot(tri[0] - seed, n) <= 0.0) return false;
+        }
+    }
+
+    return true;
+}
+
+static inline bool
+is_closed_seed(double (*mesh)[3][3], size_t mesh_size, vec3 seed)
+{
+    array<vec3, 2> ray;
+    vec3           tmp, p;
+    unsigned int   coll_tri_it;
+    ray[0] = seed;
+
+    for (f64 alpha = 0.0; alpha <= 180.0; alpha += 10.0) {
+        // printf("alpha: %f\n", alpha);
+        for (f64 beta = 0.0; beta < 360.0; beta += 1.0) {
+            ray[1].x = seed.x + sin(alpha) * cos(beta);
+            ray[1].y = seed.y + sin(alpha) * sin(beta);
+            ray[1].z = seed.z + cos(alpha);
+
+            bool found = false;
+            for (unsigned int tri_it = 0; tri_it < mesh_size; tri_it++) {
+                Triangle& tri  = *(Triangle*)(&mesh[tri_it]);
+                auto      coll = ray_triangle_intersection_mt(ray, tri);
+                if (!coll.first) continue;
+                tmp = lerp(ray, coll.second);
+                if (!found || //
+                    (found && (tmp - seed).squared_length() < (p - seed).squared_length())) {
+                    found       = true;
+                    p           = tmp;
+                    coll_tri_it = tri_it;
+                }
+            }
+            if (!found) return false;
+
+            Triangle& ctri = *(Triangle*)(&mesh[coll_tri_it]);
+            vec3      n    = cross(ctri[1] - ctri[0], ctri[2] - ctri[0]);
+            if (dot(ctri[0] - seed, n) <= 0.0) return false;
+        }
+    }
+
+    return true;
+}
+
+static inline void
+flood_fill_rec_imp(
+    u8 grid[], const array<i32, 3>& grid_size, unsigned int* voxel_count, i32 x, i32 y, i32 z)
+{
+    if (x < 0 || y < 0 || z < 0 || x >= grid_size[0] || y >= grid_size[1] || z >= grid_size[2]) return;
+    if (get_voxel(grid, x * grid_size[1] * grid_size[2] + y * grid_size[2] + z)) return;
+
+    set_voxel(grid, x * grid_size[1] * grid_size[2] + y * grid_size[2] + z, true);
+    (*voxel_count)++;
+
+    flood_fill_rec_imp(grid, grid_size, voxel_count, x, y, z + 1);
+    flood_fill_rec_imp(grid, grid_size, voxel_count, x, y, z - 1);
+    flood_fill_rec_imp(grid, grid_size, voxel_count, x, y + 1, z);
+    flood_fill_rec_imp(grid, grid_size, voxel_count, x, y - 1, z);
+    flood_fill_rec_imp(grid, grid_size, voxel_count, x + 1, y, z);
+    flood_fill_rec_imp(grid, grid_size, voxel_count, x - 1, y, z);
+}
+
+static inline size_t
+voxel_num(const array<i32, 3>& grid_size, const std::array<i32, 3>& v)
+{
+    return v[0] * grid_size[1] * grid_size[2] + v[1] * grid_size[2] + v[2];
+}
+
+static inline bool
+legal_and_unset(u8 grid[], const array<i32, 3>& grid_size, array<i32, 3> v)
+{
+    bool legal = !(v[0] < 0 || v[1] < 0 || v[2] < 0 || v[0] >= grid_size[0] || v[1] >= grid_size[1] ||
+                   v[2] >= grid_size[2]);
+    if (!legal) return false;
+    return !get_voxel(grid, grid_size, v);
+}
+
+static inline void
+flood_fill_rec_imp_bfs(u8                   grid[],
+                       u8                   flood_fill_mem[],
+                       const array<i32, 3>& grid_size,
+                       unsigned int*        voxel_count,
+                       i32                  x,
+                       i32                  y,
+                       i32                  z)
+{
+    unsigned int size = static_cast<unsigned int>(grid_size[0]) *
+                        static_cast<unsigned int>(grid_size[1]) *
+                        static_cast<unsigned int>(grid_size[2]);
+    Voxel_Queue q((array<i32, 3>*)flood_fill_mem, size);
+    // std::queue<array<i32, 3>> q;
+    assert(!get_voxel(grid, grid_size, { x, y, z }));
+
+    set_voxel(grid, grid_size, { x, y, z }, true);
+    (*voxel_count)++;
+    q.push({ x, y, z });
+
+    // unsigned int prev_printed_voxel_count = *voxel_count;
+    while (!q.empty()) {
+        auto v = q.front();
+        q.pop();
+
+        array<i32, 3> nb[] = { { v[0], v[1], v[2] - 1 }, { v[0], v[1], v[2] + 1 },
+                               { v[0], v[1] - 1, v[2] }, { v[0], v[1] + 1, v[2] },
+                               { v[0] - 1, v[1], v[2] }, { v[0] + 1, v[1], v[2] } };
+        for (const auto& v : nb) {
+            if (!legal_and_unset(grid, grid_size, { v[0], v[1], v[2] })) continue;
+
+            set_voxel(grid, grid_size, { v[0], v[1], v[2] }, true);
+            (*voxel_count)++;
+            q.push({ v[0], v[1], v[2] });
+        }
+
+        // if (*voxel_count - prev_printed_voxel_count > 300) {
+        // printf("voxel_count: %u\n", *voxel_count);
+        // prev_printed_voxel_count = *voxel_count;
+        // }
+    }
+}
+
+static inline unsigned int
+flood_fill_rec_scene(u8 grid[],
+                     u8 flood_fill_mem[],
+                     double (*meshes[])[3][3],
+                     size_t               meshes_size[],
+                     size_t               meshes_count,
+                     const array<i32, 3>& grid_size,
+                     unsigned int         shell_voxel_count)
+{
+    std::default_random_engine          generator;
+    std::uniform_real_distribution<f64> d[3];
+    for (int i = 0; i < 3; i++) d[i] = std::uniform_real_distribution<f64>(0.0, grid_size[i]);
+
+    array<i32, 3> iseed;
+    vec3          seed;
+    do {
+        for (int i = 0; i < 3; i++) seed[i] = d[i](generator);
+        iseed = { static_cast<i32>(seed[0]), static_cast<i32>(seed[1]), static_cast<i32>(seed[2]) };
+    } while (get_voxel(grid, grid_size, iseed) ||
+             !is_closed_seed_scene(meshes, meshes_size, meshes_count, seed));
+
+    unsigned int voxel_count = shell_voxel_count;
+    flood_fill_rec_imp_bfs(grid, flood_fill_mem, grid_size, &voxel_count, static_cast<i32>(seed.x),
+                           static_cast<i32>(seed.y), static_cast<i32>(seed.z));
+    return voxel_count;
+}
+
+static inline unsigned int
+flood_fill_rec(u8 grid[],
+               u8 flood_fill_mem[],
+               double (*mesh)[3][3],
+               size_t               mesh_size,
+               const array<i32, 3>& grid_size,
+               unsigned int         shell_voxel_count)
+{
+    std::default_random_engine          generator;
+    std::uniform_real_distribution<f64> d[3];
+    for (int i = 0; i < 3; i++) d[i] = std::uniform_real_distribution<f64>(0.0, grid_size[i]);
+
+    array<i32, 3> iseed;
+    vec3          seed;
+    do {
+        for (int i = 0; i < 3; i++) seed[i] = d[i](generator);
+        iseed = { static_cast<i32>(seed[0]), static_cast<i32>(seed[1]), static_cast<i32>(seed[2]) };
+    } while (get_voxel(grid, grid_size, iseed) || !is_closed_seed(mesh, mesh_size, seed));
+
+    unsigned int voxel_count = shell_voxel_count;
+    flood_fill_rec_imp_bfs(grid, flood_fill_mem, grid_size, &voxel_count, static_cast<i32>(seed.x),
+                           static_cast<i32>(seed.y), static_cast<i32>(seed.z));
+
+    return voxel_count;
+}
 
 static u8
 flood_fill_rast_collision_detection(u8                   grid[],
@@ -123,8 +334,7 @@ write_voxel_imp(u8                   grid[],
     size_t voxel_num =
         floor(p[0]) * grid_size[1] * grid_size[2] + floor(p[1]) * grid_size[2] + floor(p[2]);
 
-    if (voxel_num == 843772)
-        int aa =0 ;
+    if (voxel_num == 843772) int aa = 0;
 
     if (!get_voxel(grid, voxel_num)) {
         is_new_voxel = true;
@@ -146,25 +356,25 @@ write_voxel_imp(u8                   grid[],
     return is_new_voxel;
 }
 
-static inline unsigned
+static inline void
 write_voxel(u8                   grid[],
             Voxelizer::VoxelType data[],
             const array<i32, 3>& grid_size,
             const vec3&          p,
             Voxelizer::VoxelType type,
             bool                 flood_fill,
+            unsigned int*        voxel_count,
             bool                 verbose)
 {
-    unsigned result = 0;
     for (int i = 0; i < 3; i++) {
         if (p[i] >= 1.0 && floor(p[i]) == p[i]) {
             vec3 prev = p;
             prev[i] -= 1.0;
-            result += write_voxel_imp(grid, data, grid_size, prev, type, flood_fill, verbose) ? 1 : 0;
+            (*voxel_count) +=
+                write_voxel_imp(grid, data, grid_size, prev, type, flood_fill, verbose) ? 1 : 0;
         }
     }
-    result += write_voxel_imp(grid, data, grid_size, p, type, flood_fill, verbose) ? 1 : 0;
-    return result;
+    (*voxel_count) += write_voxel_imp(grid, data, grid_size, p, type, flood_fill, verbose) ? 1 : 0;
 }
 
 char
@@ -179,13 +389,15 @@ Voxelizer::voxelize(unsigned char grid[],
                     bool          flip_normals,
                     double        triangles_min[3],
                     double        triangles_max[3],
-                    bool          flood_fill,
+                    FillType      fill,
+                    unsigned char flood_fill_mem[],
                     bool          use_collision_detection,
                     unsigned char data[],
                     bool          verbose)
 {
-    if (flood_fill && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
+    if (fill == FILL_SCANLINE && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
     if (use_collision_detection && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
+    if (fill == FILL_FLOOD && !flood_fill_mem) return Voxelizer::ERROR_NO_DATA_BUFFER;
 
     if (!triangles_min || !triangles_max) {
         triangles_min = (f64*)malloc(sizeof(triangles_min[0]) * 3);
@@ -212,7 +424,11 @@ Voxelizer::voxelize(unsigned char grid[],
     for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
         for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
             Triangle& tri = *(Triangle*)(&meshes[mesh_it][tri_it]);
+            // printf("before: %s %s %s\n", tri[0].to_string().c_str(), tri[1].to_string().c_str(),
+            // tri[2].to_string().c_str());
             if (flip_normals) std::swap(tri[1], tri[2]);
+            // printf("after: %s %s %s\n", tri[0].to_string().c_str(), tri[1].to_string().c_str(),
+            // tri[2].to_string().c_str());
             for (auto& v : tri) {
                 // saves the headache of finding the grid voxel for each point
                 v = { v.z, v.x, v.y };
@@ -221,22 +437,26 @@ Voxelizer::voxelize(unsigned char grid[],
                            (v[i] - triangles_min_min);
                 }
             }
+            vec3 n = cross(tri[1] - tri[0], tri[2] - tri[0]);
+            if (n == vec3()) int a = 0;
         }
     }
+    // printf("\n");
 
     *voxel_count = 0;
     if (!use_collision_detection) {
         for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
             for (unsigned int tri_it = 0; tri_it < meshes_size[mesh_it]; tri_it++) {
-                Triangle& tri        = *(Triangle*)(&meshes[mesh_it][tri_it]);
-                vec3      tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
+                const Triangle& orig       = *(Triangle*)(&meshes[mesh_it][tri_it]);
+                Triangle        tri        = orig;
+                vec3            tri_normal = cross(tri[1] - tri[0], tri[2] - tri[0]);
                 if (tri_normal.length() < epsilon) {
                     printf("Warning: degenerated triangle is skipped\n");
                     continue;
                 }
 
                 VoxelType type;
-                if (flood_fill || data) {
+                if (fill != FILL_NONE || data) {
                     if (std::abs(tri_normal.z) < epsilon)
                         type = VoxelType::BOTH;
                     else if (tri_normal.z < 0.0)
@@ -313,10 +533,8 @@ Voxelizer::voxelize(unsigned char grid[],
                     curr[yi] = tri[0][yi];
                     curr[xi] = tri[0][xi];
 
-                    unsigned new_voxels;
-                    // unsigned new_voxels =
-                        // write_voxel(grid, (VoxelType*)data, grid_size, curr, type, flood_fill, verbose);
-                    // (*voxel_count) += new_voxels;
+                    unsigned char new_voxels;
+                    // TODO: force fill half first line, only first voxel is problematic
 
                     curr[yi] = ceil(tri[0][yi]);
                     for (auto& e : edges) e.x += e.dx * (curr[yi] - tri[0][yi]);
@@ -343,18 +561,16 @@ Voxelizer::voxelize(unsigned char grid[],
                             }
                             if (curr[zi] < 0.0) continue;
 
-                            new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
-                                                     flood_fill, verbose);
-                            (*voxel_count) += new_voxels;
+                            write_voxel(grid, (VoxelType*)data, grid_size, curr, type, fill != FILL_NONE,
+                                        voxel_count, verbose);
                         }
 
                         curr[zi] -= dzdx * (curr[xi] - edges[re].x);
                         curr[xi] = edges[re].x;
                         assert(abs(curr[zi] - (dzdx * curr[xi] + dzdy * curr[yi] + w)) < epsilon);
                         if (curr[zi] >= 0.0) {
-                            new_voxels = write_voxel(grid, (VoxelType*)data, grid_size, curr, type,
-                                                     flood_fill, verbose);
-                            (*voxel_count) += new_voxels;
+                            write_voxel(grid, (VoxelType*)data, grid_size, curr, type, fill != FILL_NONE,
+                                        voxel_count, verbose);
                         }
 
                         curr[yi] += 1.0;
@@ -365,50 +581,7 @@ Voxelizer::voxelize(unsigned char grid[],
             }
         }
 
-        for (i32 z = 0; z < grid_size[0]; z++) {
-            for (i32 x = 0; x < grid_size[1]; x++) {
-                for (i32 y = 0; y < grid_size[2]; y++) {
-                    i32 voxel_num = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
-                    if (get_voxel(grid, voxel_num)) {
-                        i32  nb[26];
-                        nb[0] = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y + 1;
-                        nb[1] = z * grid_size[1] * grid_size[2] + x * grid_size[2] + y - 1;
-                        nb[2] = z * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y;
-                        nb[3] = z * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y;
-                        nb[4] = z * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y + 1;
-                        nb[5] = z * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y + 1;
-                        nb[6] = z * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y - 1;
-                        nb[7] = z * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y - 1;
-
-                        nb[8] = (z + 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
-                        nb[9] = (z + 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y + 1;
-                        nb[10] = (z + 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y - 1;
-                        nb[11] = (z + 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y;
-                        nb[12] = (z + 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y;
-                        nb[13] = (z + 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y + 1;
-                        nb[14] = (z + 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y + 1;
-                        nb[15] = (z + 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y - 1;
-                        nb[16] = (z + 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y - 1;
-
-                        nb[17] = (z - 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y;
-                        nb[18] = (z - 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y + 1;
-                        nb[19] = (z - 1) * grid_size[1] * grid_size[2] + x * grid_size[2] + y - 1;
-                        nb[20] = (z - 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y;
-                        nb[21] = (z - 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y;
-                        nb[22] = (z - 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y + 1;
-                        nb[23] = (z - 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y + 1;
-                        nb[24] = (z - 1) * grid_size[1] * grid_size[2] + (x + 1) * grid_size[2] + y - 1;
-                        nb[25] = (z - 1) * grid_size[1] * grid_size[2] + (x - 1) * grid_size[2] + y - 1;
-
-                        bool alone = std::all_of(std::begin(nb), std::end(nb),
-                                                 [=](const i32& n) { return !get_voxel(grid, n); });
-                        if (alone ) printf("%d\n",voxel_num);
-                    }
-                }
-            }
-        }
-
-        if (flood_fill) (*voxel_count) = flood_fill_rast(grid, (VoxelType*)data, grid_size);
+        if (fill == FILL_SCANLINE) (*voxel_count) = flood_fill_rast(grid, (VoxelType*)data, grid_size);
     }
     else {
         for (unsigned int mesh_it = 0; mesh_it < meshes_count; mesh_it++) {
@@ -456,7 +629,7 @@ Voxelizer::voxelize(unsigned char grid[],
                                     (*voxel_count)++;
                                 }
 
-                                if (!flood_fill && !data) continue;
+                                if (fill == FILL_NONE && !data) continue;
                                 auto colls = find_triangle_aabb_collision(tri, edges, aabb);
                                 // if (colls.empty()) continue; // the triangle is inside the aabb
                                 if (colls.empty()) colls.insert(colls.end(), tri.cbegin(), tri.cend());
@@ -499,8 +672,20 @@ Voxelizer::voxelize(unsigned char grid[],
             }
         }
 
-        if (flood_fill)
+        if (fill == FILL_SCANLINE)
             return flood_fill_rast_collision_detection(grid, (VoxelData*)data, grid_size, voxel_count);
+    }
+
+    if (fill == FILL_FLOOD)
+        (*voxel_count) = flood_fill_rec_scene(grid, flood_fill_mem, meshes, meshes_size, meshes_count,
+                                              grid_size, *voxel_count);
+    else if (fill == FILL_FLOOD_MESHES) {
+        for (size_t i = 0; i < meshes_count; i++) {
+            f64(*mesh)[3][3] = meshes[i];
+            size_t mesh_size = meshes_size[i];
+            (*voxel_count) +=
+                flood_fill_rec(grid, flood_fill_mem, mesh, mesh_size, grid_size, *voxel_count);
+        }
     }
 
     return SUCCESS;
@@ -516,4 +701,10 @@ size_t
 Voxelizer::size_of_voxel_type()
 {
     return sizeof(VoxelType);
+}
+
+size_t
+Voxelizer::size_of_voxel_type_flood_fill()
+{
+    return 3 * sizeof(i32);
 }

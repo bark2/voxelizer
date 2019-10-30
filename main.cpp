@@ -23,7 +23,7 @@ double scene_aabb_min[3] = { std::numeric_limits<double>::max(), std::numeric_li
                              std::numeric_limits<double>::max() };
 double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
                              -std::numeric_limits<double>::max() };
-std::vector<Triangle>  triangles;
+std::vector<Triangle> triangles;
 
 int
 main(int argc, char* argv[])
@@ -76,9 +76,32 @@ main(int argc, char* argv[])
     bool include_normals = false;
     if (get_cmd(argv, argv + argc, "--include-normals")) include_normals = true;
 
-    bool flood_fill = false;
+    Voxelizer::FillType fill           = Voxelizer::FILL_NONE;
+    unsigned char*      flood_fill_mem = nullptr;
     if (get_cmd(argv, argv + argc, "--flood-fill")) {
-        flood_fill      = true;
+        fill            = Voxelizer::FILL_FLOOD;
+        include_normals = true;
+        flood_fill_mem  = (unsigned char*)malloc(grid_size[0] * grid_size[1] * grid_size[2] *
+                                                Voxelizer::size_of_voxel_type_flood_fill());
+    }
+    if (get_cmd(argv, argv + argc, "--flood-fill-meshes")) {
+        if (fill != Voxelizer::FILL_NONE) {
+            printf("Error: only one fill type is allowed\n");
+            return 1;
+        }
+
+        fill            = Voxelizer::FILL_FLOOD_MESHES;
+        include_normals = true;
+        flood_fill_mem  = (unsigned char*)malloc(grid_size[0] * grid_size[1] * grid_size[2] *
+                                                Voxelizer::size_of_voxel_type_flood_fill());
+    }
+    if (get_cmd(argv, argv + argc, "--fill-scanline")) {
+        if (fill != Voxelizer::FILL_NONE) {
+            printf("Error: only one fill type is allowed\n");
+            return 1;
+        }
+
+        fill            = Voxelizer::FILL_SCANLINE;
         include_normals = true;
     }
 
@@ -113,13 +136,13 @@ main(int argc, char* argv[])
                                       Voxelizer::size_of_voxel_type_presice());
     }
 
-    double(*meshes[1])[3][3]       = { (double(*)[3][3])triangles.data() };
+    double(*meshes[1])[3][3]    = { (double(*)[3][3])triangles.data() };
     size_t       triangle_count = triangles.size();
     unsigned int voxel_count;
     char err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2], meshes,
                                    &triangle_count, 1, flip_normals, (double*)&scene_aabb_min,
-                                   (double*)&scene_aabb_max, flood_fill, use_collision_detection, data,
-                                   verbose);
+                                   (double*)&scene_aabb_max, fill, flood_fill_mem,
+                                   use_collision_detection, data, verbose);
 
     if (do_export == FORMAT::RAW) {
         if (out != stdout) printf("voxels:\t%u\n", voxel_count);
@@ -136,5 +159,6 @@ main(int argc, char* argv[])
 
     free(grid);
     free(data);
+    free(flood_fill_mem);
     return 0;
 }
