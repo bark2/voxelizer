@@ -14,11 +14,11 @@ https://goxel.xyz
 
 
 Usage:
-voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill] [--flip-normals] [--precise] [--magicavoxel]
+voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill or --flood-fill-meshes or --fill-scanline] [--flip-normals] [--precise] [--magicavoxel]
 
 
 Example:
-voxelizer --in cow.itd --grid 128,128,128 --flood-fill --precise --magicavoxel
+voxelizer --in cow.itd --grid 128,128,128 --fill-scanline --magicavoxel
 
 
 Options:
