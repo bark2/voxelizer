@@ -1,8 +1,8 @@
 all:
-	cl.exe /O2 /Fe"voxelizer" *.cpp /LIBPATH"c:\irit\irit" irit.lib
-	
+	cl.exe /O2 /Fe"voxelizer" *.cpp -I"c:\irit\irit" /link /LIBPATH:"c:\irit\irit\" irit.lib
+
 debug:
-	cl.exe /O2 /Zi /Fe"voxelizer" *.cpp /LIBPATH"c:\irit\irit" irit.lib
+        cl.exe /O2 /Zi /Fe"voxelizer" *.cpp -I"c:\irit\irit" /link /LIBPATH:"c:\irit\irit\" irit.lib
 	
 clean:
 	del voxelizer.exe *.obj *.pdb
