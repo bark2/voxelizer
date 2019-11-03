@@ -9,12 +9,12 @@
 
 #include <stdlib.h>
 #include <string>
-#include "include/irit_sm.h"
-#include "include/iritprsr.h"
-#include "include/attribut.h"
-#include "include/allocate.h"
-#include "include/ip_cnvrt.h"
-#include "include/symb_lib.h"
+#include "inc_irit/irit_sm.h"
+#include "inc_irit/iritprsr.h"
+#include "inc_irit/attribut.h"
+#include "inc_irit/allocate.h"
+#include "inc_irit/ip_cnvrt.h"
+#include "inc_irit/symb_lib.h"
 
 bool CGSkelProcessIritDataFiles(const char* filename);
 void CGSkelDumpOneTraversedObject(IPObjectStruct *PObj, IrtHmgnMatType Mat, void *Data);

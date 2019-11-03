@@ -11,6 +11,7 @@
 #include <utility>
 
 using std::array;
+using std::vector;
 void
 print_usage()
 {
@@ -23,7 +24,9 @@ double scene_aabb_min[3] = { std::numeric_limits<double>::max(), std::numeric_li
                              std::numeric_limits<double>::max() };
 double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_limits<double>::max(),
                              -std::numeric_limits<double>::max() };
-std::vector<Triangle> triangles;
+
+std::vector<std::vector<Triangle>> meshes;
+std::vector<unsigned char>         is_flipped;
 
 int
 main(int argc, char* argv[])
@@ -73,15 +76,11 @@ main(int argc, char* argv[])
     }
     sscanf(arg_resolution[1], "%d,%d,%d", &grid_size[0], &grid_size[1], &grid_size[2]);
 
-    bool include_normals = false;
-    if (get_cmd(argv, argv + argc, "--include-normals")) include_normals = true;
-
     Voxelizer::FillType fill           = Voxelizer::FILL_NONE;
     unsigned char*      flood_fill_mem = nullptr;
     if (get_cmd(argv, argv + argc, "--flood-fill")) {
-        fill            = Voxelizer::FILL_FLOOD;
-        include_normals = true;
-        flood_fill_mem  = (unsigned char*)malloc(grid_size[0] * grid_size[1] * grid_size[2] *
+        fill           = Voxelizer::FILL_FLOOD;
+        flood_fill_mem = (unsigned char*)malloc(grid_size[0] * grid_size[1] * grid_size[2] *
                                                 Voxelizer::size_of_voxel_type_flood_fill());
     }
     if (get_cmd(argv, argv + argc, "--flood-fill-meshes")) {
@@ -90,9 +89,8 @@ main(int argc, char* argv[])
             return 1;
         }
 
-        fill            = Voxelizer::FILL_FLOOD_MESHES;
-        include_normals = true;
-        flood_fill_mem  = (unsigned char*)malloc(grid_size[0] * grid_size[1] * grid_size[2] *
+        fill           = Voxelizer::FILL_FLOOD_MESHES;
+        flood_fill_mem = (unsigned char*)malloc(grid_size[0] * grid_size[1] * grid_size[2] *
                                                 Voxelizer::size_of_voxel_type_flood_fill());
     }
     if (get_cmd(argv, argv + argc, "--fill-scanline")) {
@@ -101,12 +99,8 @@ main(int argc, char* argv[])
             return 1;
         }
 
-        fill            = Voxelizer::FILL_SCANLINE;
-        include_normals = true;
+        fill = Voxelizer::FILL_SCANLINE;
     }
-
-    bool flip_normals = false;
-    if (get_cmd(argv, argv + argc, "--flip-normals")) flip_normals = true;
 
     bool use_collision_detection = false;
     if (get_cmd(argv, argv + argc, "--precise")) use_collision_detection = true;
@@ -136,13 +130,23 @@ main(int argc, char* argv[])
                                       Voxelizer::size_of_voxel_type_presice());
     }
 
-    double(*meshes[1])[3][3]    = { (double(*)[3][3])triangles.data() };
-    size_t       triangle_count = triangles.size();
+    std::vector<double(*)[3][3]> mesh_ptrs(meshes.size());
+    std::vector<size_t>          mesh_sizes(meshes.size());
+    for (size_t i = 0; i < meshes.size(); i++) {
+        mesh_ptrs[i]  = (double(*)[3][3])meshes[i].data();
+        mesh_sizes[i] = meshes[i].size();
+    }
     unsigned int voxel_count;
-    char err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2], meshes,
-                                   &triangle_count, 1, flip_normals, (double*)&scene_aabb_min,
-                                   (double*)&scene_aabb_max, fill, flood_fill_mem,
-                                   use_collision_detection, data, verbose);
+    char         err = Voxelizer::voxelize(grid, &voxel_count, grid_size[0], grid_size[1], grid_size[2],
+                                   mesh_ptrs.data(), is_flipped.data(), mesh_sizes.data(), meshes.size(),
+                                   (double*)&scene_aabb_min, (double*)&scene_aabb_max, fill,
+                                   flood_fill_mem, use_collision_detection, data, verbose);
+    if (err != Voxelizer::SUCCESS) {
+        free(grid);
+        free(data);
+        free(flood_fill_mem);
+        return 1;
+    }
 
     if (do_export == FORMAT::RAW) {
         if (out != stdout) printf("voxels:\t%u\n", voxel_count);
@@ -160,5 +164,6 @@ main(int argc, char* argv[])
     free(grid);
     free(data);
     free(flood_fill_mem);
+
     return 0;
 }

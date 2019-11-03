@@ -1,4 +1,3 @@
-// #include "stdafx.h"
 #include "vox_iritSkel.h"
 #include "vox_math.h"
 #include "vox_types.h"
@@ -99,165 +98,14 @@ CGSkelDumpOneTraversedObject(IPObjectStruct* PObj, IrtHmgnMatType Mat, void* Dat
         if (!CGSkelStoreData(PObj)) exit(1);
 }
 
-/*****************************************************************************
- * DESCRIPTION:                                                               *
- *   Prints the data from given geometry object.
- **
- *                                                                            *
- * PARAMETERS:                                                                *
- *   PObj:       Object to print.                                             *
- *   Indent:     Column of indentation.                                       *
- *                                                                            *
- * RETURN VALUE:                                                              *
- *   bool:		false - fail, true - success.                                *
- *****************************************************************************/
+using Triangle = std::array<std::array<double, 3>, 3>;
 
 void
-triangulate_ear_clipping(IPPolygonStruct* poly)
+triangulate_convex(std::vector<Triangle>& triangles, IPPolygonStruct* poly)
 {
-    using Triangle = std::array<std::array<double, 3>, 3>;
-    using IVoxelizer::epsilon;
-    using IVoxelizer::is_point_in_triangle;
-    using IVoxelizer::vec2;
-    using IVoxelizer::vec3;
-
-    extern double                 scene_aabb_min[3];
-    extern double                 scene_aabb_max[3];
-    extern std::vector<Triangle>  triangles;
-    extern std::vector<Triangle*> meshes;
-    extern std::vector<size_t>    meshes_size;
-
-    IPVertexStruct* p;
-    IPVertexStruct* prev;
-    IPVertexStruct* curr;
-    IPVertexStruct* next;
-    IPVertexStruct* botleft;
-    Triangle        t;
-
-    vec3   n       = { poly->Plane[0], poly->Plane[1], poly->Plane[2] };
-    double inv     = 1 / n.length();
-    double cos     = n[2] * inv;
-    double sin     = std::sqrt(std::pow(n[0], 2) + std::pow(n[1], 2)) * inv;
-    double u1      = n[1] * inv;
-    double u2      = n[0] * inv;
-    auto   proj_xy = [=](IPVertexStruct* pv) {
-        vec3 v  = { pv->Coord[0], pv->Coord[1], pv->Coord[2] };
-        vec3 m1 = { cos + std::pow(u1, 2) * (1 - cos), u1 * u2 * (1 - cos), u2 * sin };
-        vec3 m2 = { u1 * u2 * (1 - cos), cos + std::pow(u2, 2) * (1 - cos), -u1 * sin };
-        return vec2(dot(m1, v), dot(m2, v));
-    };
-
-    int vertex_count = 1;
-    for (prev = poly->PVertex; prev->Pnext; prev = prev->Pnext, vertex_count++)
-        ;
-    prev->Pnext = poly->PVertex;
-    printf("vertex count: %d\n", vertex_count);
-
-    prev    = poly->PVertex;
-    botleft = prev;
-    for (int i = 0; i < vertex_count; i++) {
-        if (proj_xy(prev).x < proj_xy(botleft).x ||
-            (proj_xy(prev).x == proj_xy(botleft).x && proj_xy(prev).y < proj_xy(botleft).y))
-            botleft = prev;
-        prev = prev->Pnext;
-    }
-
-    for (prev = poly->PVertex; prev->Pnext != botleft;) prev = prev->Pnext;
-    next        = botleft->Pnext;
-    bool is_ccw = IVoxelizer::signed_edge_function(proj_xy(prev), proj_xy(botleft), proj_xy(next)) < 0.0;
-
-    prev         = poly->PVertex;
-    curr         = prev->Pnext;
-    next         = curr->Pnext;
-    int prev_idx = 0, curr_idx = 1, next_idx = 2, p_idx;
-
-    for (; vertex_count >= 3;) {
-        printf("prev: %d, curr: %d, next: %d\n", prev_idx, curr_idx, next_idx);
-        // assumes the polygon is formed in a counter clockwise fashion
-        vec2 proj_prev = proj_xy(prev);
-        vec2 proj_curr = proj_xy(curr);
-        vec2 proj_next = proj_xy(next);
-
-        std::array<vec2, 3> proj_tri = { proj_prev, proj_curr, proj_next };
-        bool concave = is_ccw ? IVoxelizer::signed_edge_function(proj_prev, proj_next, proj_curr) < 0.0
-                              : IVoxelizer::signed_edge_function(proj_prev, proj_next, proj_curr) > 0.0;
-
-        if (concave) {
-            prev     = prev->Pnext;
-            curr     = curr->Pnext;
-            next     = next->Pnext;
-            prev_idx = (prev_idx + 1 == vertex_count) ? 0 : prev_idx + 1;
-            curr_idx = (curr_idx + 1 == vertex_count) ? 0 : curr_idx + 1;
-            next_idx = (next_idx + 1 == vertex_count) ? 0 : next_idx + 1;
-            if (prev == poly->PVertex) {
-                printf("ear not found\n");
-                break;
-            }
-            continue;
-        }
-
-        bool is_ear = true;
-        p           = poly->PVertex;
-        int p_idx   = 0;
-        do {
-            printf("\ttest p: %d\n", p_idx);
-            vec2 proj_p = proj_xy(p);
-
-            if (p == prev || p == curr || p == next) {
-                p_idx++;
-                continue;
-            }
-
-            if (is_point_in_triangle(proj_tri, true, proj_p)) {
-                is_ear = false;
-                break;
-            }
-
-            p = p->Pnext;
-            p_idx++;
-        } while (p_idx != vertex_count);
-
-        if (!is_ear) {
-            prev     = prev->Pnext;
-            curr     = curr->Pnext;
-            next     = next->Pnext;
-            prev_idx = (prev_idx + 1 == vertex_count) ? 0 : prev_idx + 1;
-            curr_idx = (curr_idx + 1 == vertex_count) ? 0 : curr_idx + 1;
-            next_idx = (next_idx + 1 == vertex_count) ? 0 : next_idx + 1;
-            if (prev == poly->PVertex) {
-                printf("ear not found\n");
-                break;
-            }
-            continue;
-        }
-
-        t[0] = { prev->Coord[0], prev->Coord[1], prev->Coord[2] };
-        t[1] = { curr->Coord[0], curr->Coord[1], curr->Coord[2] };
-        t[2] = { next->Coord[0], next->Coord[1], next->Coord[2] };
-        for (int i = 0; i < 3; i++) {
-            for (int j = 0; j < 3; j++) {
-                scene_aabb_max[j] = std::max(scene_aabb_max[j], t[i][j]);
-                scene_aabb_min[j] = std::min(scene_aabb_min[j], t[i][j]);
-            }
-        }
-
-        triangles.push_back(t);
-        prev->Pnext = next; // FIXME: memory leak
-        curr        = next;
-        next        = next->Pnext;
-        vertex_count--;
-        printf("ear found\n");
-    }
-}
-
-void
-triangulate_convex(IPPolygonStruct* poly)
-{
-    using Triangle = std::array<std::array<double, 3>, 3>;
 
     extern double                scene_aabb_min[3];
     extern double                scene_aabb_max[3];
-    extern std::vector<Triangle> triangles;
     IPVertexStruct*              PVertex;
 
     Triangle t;
@@ -283,15 +131,37 @@ triangulate_convex(IPPolygonStruct* poly)
     } while (PVertex != poly->PVertex && PVertex != NULL);
 }
 
+/*****************************************************************************
+ * DESCRIPTION:                                                               *
+ *   Prints the data from given geometry object.
+ **
+ *                                                                            *
+ * PARAMETERS:                                                                *
+ *   PObj:       Object to print.                                             *
+ *   Indent:     Column of indentation.                                       *
+ *                                                                            *
+ * RETURN VALUE:                                                              *
+ *   bool:		false - fail, true - success.                                *
+ *****************************************************************************/
+
+extern double GMPolyObjectVolume(IPObjectStruct * PObj);
+
 bool
 CGSkelStoreData(IPObjectStruct* PObj)
 {
+    extern std::vector<std::vector<Triangle>> meshes;
+    extern std::vector<unsigned char>         is_flipped;
+
     if (PObj->ObjType != IP_OBJ_POLY) return true;
+
+    meshes.push_back({});
+    size_t                 mesh_idx = meshes.size() - 1;
+    std::vector<Triangle>& mesh     = meshes[mesh_idx];
+    is_flipped[mesh_idx] = (GMPolyObjectVolume(PObj) < 0.0) ? 1 : 0;
 
     for (auto poly = PObj->U.Pl; poly != NULL; poly = poly->Pnext) {
         if (poly->PVertex == NULL) return false;
-        // triangulate_earclipping(poly);
-        triangulate_convex(poly);
+        triangulate_convex(mesh, poly);
     }
 
     return true;

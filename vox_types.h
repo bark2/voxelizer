@@ -41,7 +41,7 @@ get_voxel(const u8* base, size_t voxel_num)
 {
     u8     bit  = voxel_num % 8;
     size_t byte = voxel_num / 8;
-    return base[byte] & (1 << bit);
+    return static_cast<bool>(base[byte] & (1 << bit));
 }
 
 inline void

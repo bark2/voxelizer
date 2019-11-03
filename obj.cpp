@@ -157,8 +157,7 @@ export_raw(const unsigned char grid[], array<int, 3> grid_size, FILE* out)
                 const unsigned char* voxels     = &grid[at / 8];
                 unsigned char        bit_number = at % 8;
                 unsigned char        mask       = 1 << bit_number;
-                is_valid                        = *voxels & mask;
-
+                is_valid                        = static_cast<bool>(*voxels & mask);
                 if (is_valid)
                     fputc('1', out);
                 else

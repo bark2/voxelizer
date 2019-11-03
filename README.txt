@@ -14,7 +14,7 @@ https://goxel.xyz
 
 
 Usage:
-voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill or --flood-fill-meshes or --fill-scanline] [--flip-normals] [--precise] [--magicavoxel]
+voxelizer --in inputfile [--out outputfile] --grid x,y,z [--flood-fill or --flood-fill-meshes or --fill-scanline] [--precise] [--magicavoxel]
 
 
 Example:
@@ -40,14 +40,13 @@ Options:
 --fill-scanline
         do scanline flood filling
 
---flip-normals
-        should normals be flipped
-
 --precise
         use the collision method for generating voxels
 
 --magicavoxel
-        ouput magicavoxel instead of printing to the default one - stdout.
+        ouput magicavoxel instead
+        the default method for printing is as a char grid of zeros and ones:
+                char matrix[z][x][y] = (set) ? 1 : 0
         *** magicavoxel file format doesnt support a grid dimension higher than 128 ***
 
 
