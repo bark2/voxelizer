@@ -1,13 +1,14 @@
 About:
-A voxelizer for triangular(or convex polygonal) IRIT itd meshes.
+A voxelizer for triangular(or convex polygonal) IRIT[1] itd meshes.
 The code comes in two parts.
 
 voxelizer.cpp which contains the voxelize interface function which could be imported to other projects.
 voxelize() will not alloc, thus all used memory will be provided by the caller
 
 main.cpp which contains a main function that could be compiled into an executable.
-The final executable with the specified option will ouput magicavoxel .vox file format. It could be then displayed with magicavoxel[1] or goxel[2] for example.
+The final executable with the specified option will ouput magicavoxel .vox file format[2]. It could be then displayed with magicavoxel[3] or goxel[4] for example.
 
+http://www.cs.technion.ac.il/~irit/
 https://github.com/ephtracy/voxel-model/blob/master/MagicaVoxel-file-format-vox.txt
 https://ephtracy.github.io/
 https://goxel.xyz
