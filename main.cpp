@@ -16,7 +16,7 @@ void
 print_usage()
 {
     printf(
-        "Usage: voxelizer --in inputfile --out outputfile --grid x,y,z [--flood-fill or --flood-fill-meshes or --fill-scanline] [--flip-normals] [--precise] [--magicavoxel]\n");
+        "voxelizer --in inputfile [--out outputfile] --grid x,y,z [--flood-fill or --flood-fill-meshes or --fill-scanline] [--precise] [--magicavoxel]\n");
 }
 
 using Triangle           = std::array<std::array<double, 3>, 3>;
@@ -26,6 +26,7 @@ double scene_aabb_max[3] = { -std::numeric_limits<double>::max(), -std::numeric_
                              -std::numeric_limits<double>::max() };
 
 std::vector<std::vector<Triangle>> meshes;
+Voxelizer::FillType                fill = Voxelizer::FILL_NONE;
 std::vector<unsigned char>         is_flipped;
 
 int
@@ -76,7 +77,6 @@ main(int argc, char* argv[])
     }
     sscanf(arg_resolution[1], "%d,%d,%d", &grid_size[0], &grid_size[1], &grid_size[2]);
 
-    Voxelizer::FillType fill           = Voxelizer::FILL_NONE;
     unsigned char*      flood_fill_mem = nullptr;
     if (get_cmd(argv, argv + argc, "--flood-fill")) {
         fill           = Voxelizer::FILL_FLOOD;

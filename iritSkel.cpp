@@ -1,6 +1,7 @@
 #include "vox_iritSkel.h"
 #include "vox_math.h"
 #include "vox_types.h"
+#include "voxelizer.h"
 #include <array>
 #include <vector>
 
@@ -101,7 +102,7 @@ CGSkelDumpOneTraversedObject(IPObjectStruct* PObj, IrtHmgnMatType Mat, void* Dat
 using Triangle = std::array<std::array<double, 3>, 3>;
 
 void
-triangulate_convex(std::vector<Triangle>& triangles, IPPolygonStruct* poly)
+save_triangles_convex(std::vector<Triangle>& triangles, IPPolygonStruct* poly)
 {
 
     extern double                scene_aabb_min[3];
@@ -145,11 +146,13 @@ triangulate_convex(std::vector<Triangle>& triangles, IPPolygonStruct* poly)
  *****************************************************************************/
 
 extern double GMPolyObjectVolume(IPObjectStruct * PObj);
+extern void GMVrtxListToCircOrLin(IPPolygonStruct *Pls, int DoCirc);
 
 bool
 CGSkelStoreData(IPObjectStruct* PObj)
 {
     extern std::vector<std::vector<Triangle>> meshes;
+    extern Voxelizer::FillType                fill;
     extern std::vector<unsigned char>         is_flipped;
 
     if (PObj->ObjType != IP_OBJ_POLY) return true;
@@ -157,11 +160,19 @@ CGSkelStoreData(IPObjectStruct* PObj)
     meshes.push_back({});
     size_t                 mesh_idx = meshes.size() - 1;
     std::vector<Triangle>& mesh     = meshes[mesh_idx];
-    is_flipped[mesh_idx] = (GMPolyObjectVolume(PObj) < 0.0) ? 1 : 0;
 
-    for (auto poly = PObj->U.Pl; poly != NULL; poly = poly->Pnext) {
+    IPPolygonStruct* poly = PObj->U.Pl;
+    if (fill == Voxelizer::FILL_NONE)
+        is_flipped.push_back(0);
+    else {
+        GMVrtxListToCircOrLin(poly, 1);
+        is_flipped.push_back(GMPolyObjectVolume(PObj) ? 1 : 0);
+        GMVrtxListToCircOrLin(poly, 0);
+    }
+
+    for (; poly != NULL; poly = poly->Pnext) {
         if (poly->PVertex == NULL) return false;
-        triangulate_convex(mesh, poly);
+        save_triangles_convex(mesh, poly);
     }
 
     return true;
