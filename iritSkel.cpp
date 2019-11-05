@@ -132,21 +132,8 @@ save_triangles_convex(std::vector<Triangle>& triangles, IPPolygonStruct* poly)
     } while (PVertex != poly->PVertex && PVertex != NULL);
 }
 
-/*****************************************************************************
- * DESCRIPTION:                                                               *
- *   Prints the data from given geometry object.
- **
- *                                                                            *
- * PARAMETERS:                                                                *
- *   PObj:       Object to print.                                             *
- *   Indent:     Column of indentation.                                       *
- *                                                                            *
- * RETURN VALUE:                                                              *
- *   bool:		false - fail, true - success.                                *
- *****************************************************************************/
-
-extern double GMPolyObjectVolume(IPObjectStruct * PObj);
-extern void GMVrtxListToCircOrLin(IPPolygonStruct *Pls, int DoCirc);
+extern double GMPolyObjectVolume(IPObjectStruct* PObj);
+extern void   GMVrtxListToCircOrLin(IPPolygonStruct* Pls, int DoCirc);
 
 bool
 CGSkelStoreData(IPObjectStruct* PObj)
@@ -165,8 +152,10 @@ CGSkelStoreData(IPObjectStruct* PObj)
     if (fill == Voxelizer::FILL_NONE)
         is_flipped.push_back(0);
     else {
-        GMVrtxListToCircOrLin(poly, 1);
-        is_flipped.push_back(GMPolyObjectVolume(PObj) ? 1 : 0);
+        IPSetPolyListCirc(TRUE);
+	GMVrtxListToCircOrLin(poly, 1);
+        is_flipped.push_back(GMPolyObjectVolume(PObj) > 0.0 ? 1 : 0);
+	IPSetPolyListCirc(FALSE);
         GMVrtxListToCircOrLin(poly, 0);
     }
 
