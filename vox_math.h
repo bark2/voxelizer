@@ -224,10 +224,8 @@ get_barycentrics(const Triangle& t, const vec3& p, bool verbose = false)
 
 // in the case of collision, t :: [0, line.length()]
 inline std::pair<bool, f64>
-line_triangle_intersection_mt(const array<vec3, 2>& line,
-                              f64                   line_length,
-                              const Triangle&       tri,
-                              vec3                  edges[3])
+line_triangle_intersection_mt(const array<vec3, 2>& line, f64 line_length, const Triangle& tri,
+                              vec3 edges[3])
 {
     vec3 dir  = line[1] - line[0];
     vec3 udir = dir / line_length;
@@ -254,8 +252,7 @@ line_triangle_intersection_mt(const array<vec3, 2>& line,
 
 // in the case of collision, t :: [0, line.length()]
 inline std::pair<bool, f64>
-ray_triangle_intersection_mt(const array<vec3, 2>& ray,
-                             const Triangle&       tri)
+ray_triangle_intersection_mt(const array<vec3, 2>& ray, const Triangle& tri)
 {
     vec3 dir  = ray[1] - ray[0];
     vec3 udir = dir / dir.length();
@@ -333,10 +330,8 @@ line_triangle_intersection(const array<vec3, 2>& line, const Triangle& triangle)
 }
 
 inline std::pair<bool, vec3>
-line_triangle_intersection_fast(const array<vec3, 2>& line,
-                                const Triangle&       triangle,
-                                vec3                  edges[3],
-                                bool                  verbose = false)
+line_triangle_intersection_fast(const array<vec3, 2>& line, const Triangle& triangle, vec3 edges[3],
+                                bool verbose = false)
 {
     f64  line_length = (line[1] - line[0]).length();
     auto coll        = line_triangle_intersection_mt(line, line_length, triangle, edges);
@@ -404,8 +399,7 @@ has_seperating_line(const array<vec2, 3>& proj_triangle, bool back_facing, const
 }
 
 inline bool
-triangle_square_conservative_collision(const array<vec2, 3>& proj_triangle,
-                                       bool                  back_facing,
+triangle_square_conservative_collision(const array<vec2, 3>& proj_triangle, bool back_facing,
                                        const array<vec2, 2>& square)
 {
     const vec2 square_vertices[4] = {
@@ -418,8 +412,7 @@ triangle_square_conservative_collision(const array<vec2, 3>& proj_triangle,
 }
 
 inline bool
-triangle_square_6seperating_collision(const array<vec2, 3>& proj_triangle,
-                                      bool                  back_facing,
+triangle_square_6seperating_collision(const array<vec2, 3>& proj_triangle, bool back_facing,
                                       const array<vec2, 2>& square)
 {
     const array<vec2, 4> means = { vec2 { (square[0].x + square[1].x) / 2, square[0].y },
@@ -545,10 +538,8 @@ get_aabb_edges(const array<vec3, 2>& aabb)
 }
 
 inline vector<vec3>
-find_triangle_aabb_collision(const Triangle&       t,
-                             vec3                  edges[3],
-                             const array<vec3, 2>& aabb,
-                             bool                  verbose = false)
+find_triangle_aabb_collision(const Triangle& t, vec3 edges[3], const array<vec3, 2>& aabb,
+                             bool verbose = false)
 {
     auto aabb_edges = get_aabb_edges(aabb);
 
@@ -621,9 +612,7 @@ project(const Array& points, vec3 axis, f64* min, f64* max)
 }
 
 inline bool
-triangle_aabb_collision_mt(const Triangle&       tri,
-                           const vec3&           tri_normal,
-                           const vec3            edges[3],
+triangle_aabb_collision_mt(const Triangle& tri, const vec3& tri_normal, const vec3 edges[3],
                            const array<vec3, 2>& aabb)
 {
     f64 tri_min, tri_max;

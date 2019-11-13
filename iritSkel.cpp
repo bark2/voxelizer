@@ -149,15 +149,11 @@ CGSkelStoreData(IPObjectStruct* PObj)
     std::vector<Triangle>& mesh     = meshes[mesh_idx];
 
     IPPolygonStruct* poly = PObj->U.Pl;
-    if (fill == Voxelizer::FILL_NONE)
-        is_flipped.push_back(0);
-    else {
-        IPSetPolyListCirc(TRUE);
-	GMVrtxListToCircOrLin(poly, 1);
-        is_flipped.push_back(GMPolyObjectVolume(PObj) > 0.0 ? 1 : 0);
-	IPSetPolyListCirc(FALSE);
-        GMVrtxListToCircOrLin(poly, 0);
-    }
+    IPSetPolyListCirc(TRUE);
+    GMVrtxListToCircOrLin(poly, 1);
+    is_flipped.push_back(GMPolyObjectVolume(PObj) > 0.0 ? 1 : 0);
+    IPSetPolyListCirc(FALSE);
+    GMVrtxListToCircOrLin(poly, 0);
 
     for (; poly != NULL; poly = poly->Pnext) {
         if (poly->PVertex == NULL) return false;

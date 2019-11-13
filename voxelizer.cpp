@@ -98,8 +98,8 @@ is_closed_seed(double (*mesh)[3][3], size_t mesh_size, vec3 seed)
 }
 
 static inline void
-flood_fill_rec_imp(
-    u8 grid[], const array<i32, 3>& grid_size, unsigned int* voxel_count, i32 x, i32 y, i32 z)
+flood_fill_rec_imp(u8 grid[], const array<i32, 3>& grid_size, unsigned int* voxel_count, i32 x, i32 y,
+                   i32 z)
 {
     if (x < 0 || y < 0 || z < 0 || x >= grid_size[0] || y >= grid_size[1] || z >= grid_size[2]) return;
     if (get_voxel(grid, x * grid_size[1] * grid_size[2] + y * grid_size[2] + z)) return;
@@ -131,13 +131,8 @@ legal_and_unset(u8 grid[], const array<i32, 3>& grid_size, array<i32, 3> v)
 }
 
 static inline void
-flood_fill_rec_imp_bfs(u8                   grid[],
-                       u8                   flood_fill_mem[],
-                       const array<i32, 3>& grid_size,
-                       unsigned int*        voxel_count,
-                       i32                  x,
-                       i32                  y,
-                       i32                  z)
+flood_fill_rec_imp_bfs(u8 grid[], u8 flood_fill_mem[], const array<i32, 3>& grid_size,
+                       unsigned int* voxel_count, i32 x, i32 y, i32 z)
 {
     unsigned int size = static_cast<unsigned int>(grid_size[0]) *
                         static_cast<unsigned int>(grid_size[1]) *
@@ -167,13 +162,8 @@ flood_fill_rec_imp_bfs(u8                   grid[],
 }
 
 static inline unsigned int
-flood_fill_rec_scene(u8 grid[],
-                     u8 flood_fill_mem[],
-                     double (*meshes[])[3][3],
-                     size_t               meshes_size[],
-                     size_t               meshes_count,
-                     const array<i32, 3>& grid_size,
-                     unsigned int         shell_voxel_count)
+flood_fill_rec_scene(u8 grid[], u8 flood_fill_mem[], double (*meshes[])[3][3], size_t meshes_size[],
+                     size_t meshes_count, const array<i32, 3>& grid_size, unsigned int shell_voxel_count)
 {
     std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
     std::uniform_real_distribution<f64> d[3];
@@ -195,12 +185,8 @@ flood_fill_rec_scene(u8 grid[],
 }
 
 static inline unsigned int
-flood_fill_rec(u8 grid[],
-               u8 flood_fill_mem[],
-               double (*mesh)[3][3],
-               size_t               mesh_size,
-               const array<i32, 3>& grid_size,
-               unsigned int         shell_voxel_count)
+flood_fill_rec(u8 grid[], u8 flood_fill_mem[], double (*mesh)[3][3], size_t mesh_size,
+               const array<i32, 3>& grid_size, unsigned int shell_voxel_count)
 {
     std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
     std::uniform_real_distribution<f64> d[3];
@@ -221,10 +207,8 @@ flood_fill_rec(u8 grid[],
 }
 
 static u8
-flood_fill_rast_collision_detection(u8                   grid[],
-                                    VoxelData            data[],
-                                    const array<i32, 3>& grid_size,
-                                    unsigned int*        voxel_count)
+flood_fill_rast_collision_detection(u8 grid[], VoxelData data[], const array<i32, 3>& grid_size,
+                                    unsigned int* voxel_count)
 {
     u8 result = Voxelizer::SUCCESS;
 
@@ -307,8 +291,6 @@ flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
                     voxel_count++;
                 }
             }
-
-            // if (last.type == Voxel2::OPENING) printf("bad point: %d %d %d\n", x, y, last.z);
         }
     }
 
@@ -316,19 +298,14 @@ flood_fill_rast(u8 grid[], VoxelType data[], const array<i32, 3>& grid_size)
 }
 
 static inline bool
-write_voxel_imp(u8                   grid[],
-                Voxelizer::VoxelType data[],
-                const array<i32, 3>& grid_size,
-                const vec3&          p,
-                Voxelizer::VoxelType type,
-                bool                 flood_fill,
-                bool                 verbose)
+write_voxel_imp(u8 grid[], Voxelizer::VoxelType data[], const array<i32, 3>& grid_size, const vec3& p,
+                Voxelizer::VoxelType type, bool flood_fill, bool verbose)
 {
-    bool   is_new_voxel = false;
+    bool          is_new_voxel = false;
     array<i32, 3> v;
-    v[0] = static_cast<i32>(floor(p[0]));
-    v[1] = static_cast<i32>(floor(p[1]));
-    v[2] = static_cast<i32>(floor(p[2]));
+    v[0]             = static_cast<i32>(floor(p[0]));
+    v[1]             = static_cast<i32>(floor(p[1]));
+    v[2]             = static_cast<i32>(floor(p[2]));
     size_t voxel_num = calc_voxel_num(grid_size, v);
 
     if (!get_voxel(grid, voxel_num)) {
@@ -352,14 +329,8 @@ write_voxel_imp(u8                   grid[],
 }
 
 static inline void
-write_voxel(u8                   grid[],
-            Voxelizer::VoxelType data[],
-            const array<i32, 3>& grid_size,
-            const vec3&          p,
-            Voxelizer::VoxelType type,
-            bool                 flood_fill,
-            unsigned int*        voxel_count,
-            bool                 verbose)
+write_voxel(u8 grid[], Voxelizer::VoxelType data[], const array<i32, 3>& grid_size, const vec3& p,
+            Voxelizer::VoxelType type, bool flood_fill, unsigned int* voxel_count, bool verbose)
 {
     for (int i = 0; i < 3; i++) {
         if (p[i] >= 1.0 && floor(p[i]) == p[i]) {
@@ -373,22 +344,11 @@ write_voxel(u8                   grid[],
 }
 
 char
-Voxelizer::voxelize(unsigned char grid[],
-                    unsigned int* voxel_count,
-                    int           grid_size_x,
-                    int           grid_size_y,
-                    int           grid_size_z,
-                    double (*meshes[])[3][3],
-                    u8            flip_normals[],
-                    size_t        meshes_size[],
-                    size_t        meshes_count,
-                    double        triangles_min[3],
-                    double        triangles_max[3],
-                    FillType      fill,
-                    unsigned char flood_fill_mem[],
-                    bool          use_collision_detection,
-                    unsigned char data[],
-                    bool          verbose)
+Voxelizer::voxelize(unsigned char grid[], unsigned int* voxel_count, int grid_size_x, int grid_size_y,
+                    int grid_size_z, double (*meshes[])[3][3], u8 flip_normals[], size_t meshes_size[],
+                    size_t meshes_count, double triangles_min[3], double triangles_max[3], FillType fill,
+                    unsigned char flood_fill_mem[], bool use_collision_detection, unsigned char data[],
+                    bool verbose)
 {
     if (fill == FILL_SCANLINE && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
     if (use_collision_detection && !data) return Voxelizer::ERROR_NO_DATA_BUFFER;
